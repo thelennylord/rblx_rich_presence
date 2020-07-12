@@ -1,6 +1,6 @@
 [package]
 name = "rblx_rich_presence"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["thelennylord <32369619+thelennylord@users.noreply.github.com>"]
 edition = "2018"
 
