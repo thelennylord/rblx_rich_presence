@@ -1,0 +1,19 @@
+[package]
+name = "rblx_rich_presence"
+version = "0.1.4"
+authors = ["thelennylord <32369619+thelennylord@users.noreply.github.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.5.6"
+url = "2.1.1"
+reqwest = { version = "0.10.6", features = ["blocking", "json"] }
+winreg = "0.7.0"
+sysinfo = "0.14.7"
+serde_json = "1.0.55"
+rustcord = "0.2.4"
+base64 = "0.12.3"
+winapi = { version = "0.3", features = ["shellapi", "libloaderapi", "errhandlingapi", "impl-default"] }
