@@ -446,6 +446,7 @@ impl Roblox {
         let total_servers = &data["TotalCollectionSize"].as_u64().unwrap();
         let max_tries: u64 = (total_servers / 100) + 1;
 
+        // get list of all servers
         for _ in 0..max_tries {
             let url = format!("https://games.roblox.com/v1/games/{}/servers/Public?sortOrder=Asc&limit=100&cursor={}", &self.join_data.place_id, next_cursor_page);
             let resp = client.get(&url).send().unwrap();
@@ -453,10 +454,13 @@ impl Roblox {
                 panic!("Server error detected!");
             }
 
-            let datap =
-                serde_json::from_str::<RobloxServerListData>(&resp.text().unwrap()).unwrap();
+            let datap = serde_json::from_str::<RobloxServerListData>(&resp.text().unwrap()).unwrap();
             next_cursor_page = datap.nextPageCursor.unwrap_or(String::new());
-            for item in datap.data {
+            if let None = datap.data {
+                continue;
+            }
+
+            for item in datap.data.unwrap() {
                 if item.id == self.join_data.job_id {
                     return item;
                 }
@@ -536,7 +540,7 @@ impl Roblox {
 pub struct RobloxServerListData {
     previousPageCursor: Option<String>,
     nextPageCursor: Option<String>,
-    data: Vec<RobloxServerData>,
+    data: Option<Vec<RobloxServerData>>,
 }
 
 #[derive(Deserialize, Debug)]
