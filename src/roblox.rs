@@ -278,7 +278,7 @@ impl Roblox {
                     };
                     if res.status().is_success() {
                         let data: RequestGameReponse = res.json().unwrap();
-                        let job_id = match &data.jobId {
+                        let job_id = match &data.job_id {
                             Some(value) => value,
                             None => {
                                 println!("Error while getting job id: {:#?}", data);
@@ -293,7 +293,7 @@ impl Roblox {
                             continue;
                         }
 
-                        let join_url = data.joinScriptUrl.unwrap().to_string();
+                        let join_url = data.join_script_url.unwrap().to_string();
                         let parsed_url = log_fail!(Url::parse(&join_url));
                         let query: HashMap<String, String> =
                             parsed_url.query_pairs().into_owned().collect();
@@ -350,7 +350,7 @@ impl Roblox {
                     .unwrap();
                 if resp.status().is_success() {
                     let data: RequestGameReponse = resp.json::<RequestGameReponse>().unwrap();
-                    self.join_data.job_id = match &data.jobId {
+                    self.join_data.job_id = match &data.job_id {
                         Some(value) => value.to_string(),
                         None => {
                             match &data.status {
@@ -371,7 +371,7 @@ impl Roblox {
                         }
                     };
                     let join_url =
-                        log_fail!(data.joinScriptUrl.ok_or("Failed to get join script url"))
+                        log_fail!(data.join_script_url.ok_or("Failed to get join script url"))
                             .to_string();
                     let parsed_url = Url::parse(&join_url).unwrap();
                     let query: HashMap<String, String> =
@@ -455,7 +455,7 @@ impl Roblox {
             }
 
             let datap = serde_json::from_str::<RobloxServerListData>(&resp.text().unwrap()).unwrap();
-            next_cursor_page = datap.nextPageCursor.unwrap_or(String::new());
+            next_cursor_page = datap.next_page_cursor.unwrap_or(String::new());
             if let None = datap.data {
                 continue;
             }
@@ -469,7 +469,7 @@ impl Roblox {
 
         RobloxServerData {
             id: "0".to_string(),
-            maxPlayers: 0,
+            max_players: 0,
             playing: None,
             fps: None,
             ping: None,
@@ -477,8 +477,8 @@ impl Roblox {
     }
 
     pub fn update_game_info(&mut self) -> Option<&mut Self> {
-        // during the first call, roblox returns status 10 (user not in game) as our info on the api hasn't been updated yet
-        // so skip the first call
+        // During the first call, roblox returns status 10 (user not in game) as our info on the api hasn't been updated yet.
+        // So, skip the first call
         if self.skip_update {
             self.skip_update = false;
             return Some(self);
@@ -500,10 +500,15 @@ impl Roblox {
         
         if res.status().is_success() {
             let data: RequestGameReponse = res.json().unwrap();
-            if let Some(value) = data.jobId {
+            if let Some(value) = data.job_id {
+                // User is in a universe place which roblox didn't display
+                // So, return None
+                if value.starts_with("JoinPlace=") {
+                    return None;
+                }
                 self.join_data.job_id = value;
 
-                let join_url = log_fail!(data.joinScriptUrl.ok_or("Failed to get join script url")).to_string();
+                let join_url = log_fail!(data.join_script_url.ok_or("Failed to get join script url")).to_string();
                 let parsed_url = Url::parse(&join_url).unwrap();
                 let query: HashMap<String, String> = parsed_url.query_pairs().into_owned().collect();
                 let json_data: Value = serde_json::from_str(&query.get("ticket").unwrap()).unwrap();
@@ -536,31 +541,31 @@ impl Roblox {
 }
 
 #[derive(Deserialize, Debug)]
-#[allow(non_snake_case)]
+#[serde(rename_all = "camelCase")]
 pub struct RobloxServerListData {
-    previousPageCursor: Option<String>,
-    nextPageCursor: Option<String>,
+    previous_page_cursor: Option<String>,
+    next_page_cursor: Option<String>,
     data: Option<Vec<RobloxServerData>>,
 }
 
 #[derive(Deserialize, Debug)]
-#[allow(non_snake_case)]
+#[serde(rename_all = "camelCase")]
 pub struct RobloxServerData {
     pub id: String,
-    pub maxPlayers: u32,
+    pub max_players: u32,
     pub playing: Option<u32>,
     pub fps: Option<f32>,
     pub ping: Option<u64>,
 }
 
 #[derive(Deserialize, Debug)]
-#[allow(non_snake_case)]
+#[serde(rename_all = "PascalCase")]
 pub struct RobloxUserInfo {
-    pub Id: u64,
-    pub Username: String,
-    pub AvatarUri: Option<String>,
-    pub AvatarFinal: bool,
-    pub IsOnline: bool
+    pub id: u64,
+    pub username: String,
+    pub avatar_uri: Option<String>,
+    pub avatar_final: bool,
+    pub is_online: bool
 }
 
 #[derive(Deserialize, Debug)]
@@ -628,10 +633,10 @@ impl RobloxJoinData {
 }
 
 #[derive(Deserialize, Debug)]
-#[allow(non_snake_case)]
+#[serde(rename_all = "camelCase")]
 pub struct RequestGameReponse {
-    pub jobId: Option<String>,
-    pub joinScriptUrl: Option<String>,
+    pub job_id: Option<String>,
+    pub join_script_url: Option<String>,
     pub status: u8,
     pub message: Option<String>,
 }

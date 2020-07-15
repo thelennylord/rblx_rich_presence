@@ -34,7 +34,7 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
         // check the game the user is in
         let updated = rblx.update_game_info();
         if let None = updated {
-            println!("WARN: Could not find the game you're, so Discord join invites are disabled until we find your server");
+            println!("WARN: Could not find the game you're, so Discord join invites are disabled until we find it");
             let presence = RichPresenceBuilder::new()
                 .state("In a game")
                 .details(&rblx.join_data.place_name)
@@ -52,7 +52,7 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
         let srv_info = &rblx.get_server_info();
 
         if srv_info.id == "0" {
-            println!("WARN: Could not find the server you are in, so Discord join invites are disabled until we find your server");
+            println!("WARN: Could not find the server you are in, so Discord join invites are disabled until we find it");
             let presence = RichPresenceBuilder::new()
                 .state("In a game")
                 .details(&rblx.join_data.place_name)
@@ -80,7 +80,7 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
             .party_id(&rblx.join_data.job_id)
             .start_time(now)
             .party_size(srv_info.playing.unwrap_or(1))
-            .party_max(srv_info.maxPlayers)
+            .party_max(srv_info.max_players)
             .join_secret(&encode(join_secret))
             .build();
         crate::log_fail!(&discord.update_presence(presence));

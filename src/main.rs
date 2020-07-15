@@ -4,7 +4,7 @@ mod models;
 mod roblox;
 mod tray_menu;
 
-use base64::encode;
+//use base64::encode;
 use models::*;
 use rustcord::{RichPresenceBuilder, Rustcord};
 use std::env;
@@ -48,11 +48,6 @@ fn main() {
             println!("Launched Roblox\nLoading rich presence...");
 
             let join_data = rblx.get_join_data();
-
-            let join_secret = format!(
-                "{{\"place_id\": {}, \"job_id\": \"{}\"}}",
-                &join_data.place_id, &join_data.job_id
-            );
             let now = SystemTime::now();
             let presence = RichPresenceBuilder::new()
                 .state("In a game")
@@ -61,9 +56,7 @@ fn main() {
                 .large_image_text("Playing ROBLOX")
                 .small_image_key("play_status")
                 .small_image_text(&join_data.place_name)
-                .party_id(&join_data.job_id)
                 .start_time(now)
-                .join_secret(&encode(join_secret))
                 .build();
             log_fail!(discord.update_presence(presence));
             utils::watch(discord, rblx, now);
@@ -97,7 +90,6 @@ fn main() {
             }
             println!("Connecting to Roblox...");
             let join_url: String = log_fail!(rblx_rp_reg.get_value("join_data"));
-            let join_secret: String = log_fail!(rblx_rp_reg.get_value("join_key"));
             let discord = log_fail!(Rustcord::init::<DiscordEventHandler>(
                 "725360592570941490",
                 true,
@@ -122,9 +114,7 @@ fn main() {
                 .large_image_text("Playing ROBLOX")
                 .small_image_key("play_status")
                 .small_image_text(&join_data.place_name)
-                .party_id(&join_data.job_id)
                 .start_time(now)
-                .join_secret(&join_secret)
                 .build();
             log_fail!(rblx_rp_reg.set_value("join_data", &""));
             log_fail!(rblx_rp_reg.set_value("join_key", &""));
