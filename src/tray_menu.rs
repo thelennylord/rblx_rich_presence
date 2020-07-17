@@ -223,7 +223,7 @@ pub unsafe fn start(tx: Sender<Sender<bool>>) {
         nid.hIcon = hicon as HICON;
     }
 
-    let tooltip = "Roblox Rich Presence".as_bytes().clone();
+    let tooltip = b"Roblox Rich Presence".clone();
     for i in 0..tooltip.len() {
         nid.szTip[i] = tooltip[i] as u16;
     }
@@ -252,14 +252,11 @@ pub unsafe fn start(tx: Sender<Sender<bool>>) {
     winuser::ShowWindow(GetConsoleWindow(), 0);
 
     std::thread::spawn(move || loop {
-        match rx.try_recv() {
-            Ok(_) => {
-                Shell_NotifyIconW(NIM_DELETE, &mut safe_nid.nid as *mut NOTIFYICONDATAW);
-                winuser::PostQuitMessage(0);
-                tx.send(send.clone()).unwrap();
-                break;
-            },
-            Err(_) => {}
+        if rx.try_recv().is_ok() {
+            Shell_NotifyIconW(NIM_DELETE, &mut safe_nid.nid as *mut NOTIFYICONDATAW);
+            winuser::PostQuitMessage(0);
+            tx.send(send.clone()).unwrap();
+            break;
         };
         std::thread::sleep(std::time::Duration::from_secs(1))
     });

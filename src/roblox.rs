@@ -4,7 +4,6 @@ use reqwest::header;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::option::Option;
 use std::process::Command;
 use std::thread;
 use std::time;
@@ -36,7 +35,7 @@ impl Roblox {
             enums::KEY_SET_VALUE,
         )?;
         // prevents roblox from installing again, which we don't want
-        rblx_reg.set_value("", &format!("\"{}\" %1", &self.path).as_str())?;
+        rblx_reg.set_value("", &format!("\"{}\" %1", &self.path))?;
 
         // spawn RobloxPlayerLauncher.exe
         let mut rblx_launcher = Command::new(&self.path);
@@ -456,7 +455,7 @@ impl Roblox {
 
             let datap = serde_json::from_str::<RobloxServerListData>(&resp.text().unwrap()).unwrap();
             next_cursor_page = datap.next_page_cursor.unwrap_or(String::new());
-            if let None = datap.data {
+            if datap.data.is_none() {
                 continue;
             }
 

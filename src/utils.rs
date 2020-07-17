@@ -12,14 +12,14 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time;
 use std::time::SystemTime;
-use sysinfo;
-use sysinfo::{ProcessExt, Signal, SystemExt};
+use winreg::{enums, RegKey};
+use sysinfo::{System, SystemExt};
 
 pub fn pause() {
     let mut stdout = stdout();
-    stdout.write(b"\nPress Enter to continue...").unwrap();
+    stdout.write_all(b"\nPress Enter to continue...").unwrap();
     stdout.flush().unwrap();
-    stdin().read(&mut [0]).unwrap();
+    stdin().read_exact(&mut [0]).unwrap();
 }
 
 fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, now: SystemTime) {
@@ -33,7 +33,7 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
     if config.presence.show_presence {
         // check the game the user is in
         let updated = rblx.update_game_info();
-        if let None = updated {
+        if updated.is_none() {
             println!("WARN: Could not find the game you're, so Discord join invites are disabled until we find it");
             let presence = RichPresenceBuilder::new()
                 .state("In a game")
@@ -90,18 +90,17 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
 }
 
 pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
-    let mut tries: u8 = 0;
     let disc = Arc::new(disc);
     let rblx = Arc::new(Mutex::new(rblx));
 
-    // tray menu thread
+    // Tray menu thread
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || unsafe {
         tray_menu::start(tx);
     });
     let tray_tx = rx.recv().unwrap();
 
-    // discord rp thread
+    // Discord Rich Presence thread
     let thread_disc = disc.clone();
     let thread_rblx = rblx.clone();
     thread::spawn(move || loop {
@@ -109,7 +108,8 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
         update_presence(&config, &thread_disc, &thread_rblx, now);
         thread::sleep(time::Duration::from_secs(config.presence.update_interval));
     });
-    // config thread
+
+    // Config watcher thread
     let config_path = std::env::current_exe()
         .unwrap()
         .parent()
@@ -117,7 +117,7 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
         .join("config.toml");
     let prev_time = Arc::new(Mutex::new(0 as u64));
     let thread2_disc = disc.clone();
-    let thread2_rblx = rblx.clone();
+    let thread2_rblx = rblx;//.clone();
     let thread_prev_time = Arc::clone(&prev_time);
     thread::spawn(move || loop {
         let metadata = crate::log_fail!(std::fs::metadata(&config_path));
@@ -138,52 +138,53 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
         }
         thread::sleep(time::Duration::from_secs(1));
     });
+
+    // Main loop
+    let mut tries: u8 = 0;
     loop {
-        let system = sysinfo::System::new_all();
-        let mut rblx_found = false;
+        let system = System::new_all();
         let duration = time::Duration::from_millis(500);
+        let rblx_not_found: bool = system.get_process_by_name("RobloxPlayerBeta.exe").is_empty();
+        
         thread::sleep(duration);
         disc.run_callbacks();
-        for _ in system.get_process_by_name("RobloxPlayerBeta.exe") {
-            rblx_found = true;
-            tries = 16;
-        }
-        if !rblx_found {
+        
+        
+        if rblx_not_found {
             if tries < 15 {
-                // handle when roblox is updating
+                // Check whether Roblox is updating by starting a loop which will check whether the launcher is opened
+                let mut updated: bool = false;
                 loop {
-                    let mut found_launcher = false;
-                    for _ in system.get_process_by_name("RobloxPlayerLauncher.exe") {
-                        found_launcher = true;
-                    }
-                    if !found_launcher {
+                    let rblx_launcher: bool = !system.get_process_by_name("RobloxPlayerLauncher.exe").is_empty();
+                    if rblx_launcher {
+                        println!("Found Roblox launcher open; Roblox could be updating...\nWaiting for Roblox Launcher to close...");
+                        updated = true;
                         continue;
-                    }
-                    // presume roblox launcher has finished updating
-                    // we'll have to kill RobloxPlayerBeta.exe as original values will be passed
-                    // we'll have to also set the url protocol again as roblox resets it after every update
-                    let mut found_rblx = false;
-                    loop {
-                        for process in system.get_process_by_name("RobloxPlayerBeta.exe") {
-                            found_rblx = true;
-                            process.kill(Signal::Kill);
-                        }
-                        if found_rblx {
-                            break;
-                        };
                     }
                     break;
                 }
-                thread::sleep(duration);
+
+                if updated {
+                    // Registry values have been reset, so revert them back
+                    let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);
+                    let rblx_reg = crate::log_fail!(hkcr.open_subkey_with_flags(
+                        r"Software\Classes\roblox-player\shell\open\command",
+                        enums::KEY_SET_VALUE,
+                    ));
+
+                    crate::log_fail!(rblx_reg.set_value("", &format!("\"{}\" \"%1\"", std::env::current_exe().unwrap().to_str().unwrap())));
+                }
+
                 tries += 1;
                 println!("Could not find Roblox, trying again...");
-                continue;
-            } else if tries != 16 {
+            } else {
                 println!("Could not find Roblox, shutting down...");
-                std::process::exit(0);
+                break;
+                //std::process::exit(0);
             }
-            break;
+            continue;
         }
+        tries = 16;
     }
 
     disc.clear_presence();
@@ -227,7 +228,7 @@ pub fn set_config(config: &Config) -> Result<(), std::io::Error> {
         ),
         "Could not write to config.toml"
     );
-    file.write(config_toml.as_bytes())?;
+    file.write_all(config_toml.as_bytes())?;
     Ok(())
 }
 
