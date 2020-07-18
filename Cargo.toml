@@ -4,6 +4,8 @@ description = "Roblox with Rich Presence"
 version = "0.1.6"
 authors = ["thelennylord <32369619+thelennylord@users.noreply.github.com>"]
 edition = "2018"
+readme = "README.md"
+license = "MIT"
 build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

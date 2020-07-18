@@ -195,16 +195,17 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
 }
 
 pub fn get_config() -> Result<Config, std::io::Error> {
+    let dir = std::env::current_exe()?;
+    let err_msg = format!("Could not find config.toml at {:#?}", &dir);
     let mut file = crate::log_fail!(
         File::open(
-            std::env::current_exe()?
+            dir
                 .parent()
                 .unwrap()
                 .join("config.toml")
         ),
-        "Could not find config.toml in exe directory"
+        err_msg
     );
-    //.expect("Could not find config.toml in exe directory");
 
     let mut buffer: String = String::new();
 
