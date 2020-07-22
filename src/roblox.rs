@@ -355,6 +355,9 @@ impl Roblox {
                             match &data.status {
                                 10 => {
                                     println!("Error while joining game: User is no longer in game",);
+                                },
+                                12 => {
+                                    println!("Error while joining the game: You aren't authorized to join this game")
                                 }
                                 _ => {
                                     println!(
@@ -366,7 +369,7 @@ impl Roblox {
                                 }
                             }
                             pause();
-                            std::process::exit(1);
+                            std::process::exit(0);
                         }
                     };
                     let join_url =
