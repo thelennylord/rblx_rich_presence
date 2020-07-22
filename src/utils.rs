@@ -141,30 +141,40 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
 
     // Main loop
     let mut tries: u8 = 0;
+    let mut system = System::new_all();
     loop {
-        let system = System::new_all();
+        system.refresh_all();
         let duration = time::Duration::from_millis(500);
         let rblx_not_found: bool = system.get_process_by_name("RobloxPlayerBeta.exe").is_empty();
         
         thread::sleep(duration);
         disc.run_callbacks();
         
-        
         if rblx_not_found {
             if tries < 15 {
                 // Check whether Roblox is updating by starting a loop which will check whether the launcher is opened
                 let mut updated: bool = false;
+                let mut update_msg_shown: bool = false;
                 loop {
-                    let rblx_launcher: bool = !system.get_process_by_name("RobloxPlayerLauncher.exe").is_empty();
-                    if rblx_launcher {
-                        println!("Found Roblox launcher open; Roblox could be updating...\nWaiting for Roblox Launcher to close...");
-                        updated = true;
-                        continue;
+                    system.refresh_all();
+
+                    if system.get_process_by_name("RobloxPlayerLauncher.exe").is_empty() {
+                        // Roblox is not updating, break out of the loop
+                        break;
                     }
-                    break;
+
+                    if !update_msg_shown {
+                        // We want the message to be displayed only once
+                        update_msg_shown = true;
+                        println!("Found Roblox launcher open; Roblox could be updating...\nWaiting for Roblox to finish updating...");
+                    }
+                    updated = true;
+                    thread::sleep(duration);
                 }
 
                 if updated {
+                    println!("Roblox has finished updating");
+                    
                     // Registry values have been reset, so revert them back
                     let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);
                     let rblx_reg = crate::log_fail!(hkcr.open_subkey_with_flags(
