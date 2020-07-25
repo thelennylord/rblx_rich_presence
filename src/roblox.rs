@@ -13,6 +13,7 @@ use winreg::{enums, RegKey};
 pub struct Roblox {
     pub join_data: RobloxJoinData,
     pub path: String,
+    pub server_hidden: bool,
     roblosecurity: String,
     skip_update: bool,
 }
@@ -22,6 +23,7 @@ impl Roblox {
         Self {
             path: "None".to_string(),
             join_data: RobloxJoinData::default(),
+            server_hidden: false,
             roblosecurity: String::default(),
             skip_update: true
         }
@@ -105,7 +107,6 @@ impl Roblox {
 
     /// Used to generate an one time authorization ticket.
     /// This ticket can be used to join games as the authorized user.
-    //TODO: generate ticket implementation
     pub fn generate_ticket(&self) -> Option<String> {
         let client = reqwest::blocking::Client::new();
 
@@ -422,10 +423,11 @@ impl Roblox {
         self
     }
 
-    pub fn get_server_info(&self) -> RobloxServerData {
+    pub fn get_server_info(&self) -> Option<RobloxServerData> {
         let mut next_cursor_page: String = String::default();
         let client = reqwest::blocking::Client::new();
-        // let total number of servers
+
+        // Get total number of servers
         let res = client
             .get(&format!(
                 "https://www.roblox.com/games/getgameinstancesjson?placeId={}&startIndex=0",
@@ -464,18 +466,12 @@ impl Roblox {
 
             for item in datap.data.unwrap() {
                 if item.id == self.join_data.job_id {
-                    return item;
+                    return Some(item);
                 }
             }
         }
 
-        RobloxServerData {
-            id: "0".to_string(),
-            max_players: 0,
-            playing: None,
-            fps: None,
-            ping: None,
-        }
+        None
     }
 
     pub fn update_game_info(&mut self) -> Option<&mut Self> {
@@ -502,38 +498,103 @@ impl Roblox {
         
         if res.status().is_success() {
             let data: RequestGameReponse = res.json().unwrap();
-            if let Some(value) = data.job_id {
-                // User is in a universe place which roblox didn't display
-                // So, return None
-                if value.starts_with("JoinPlace=") {
-                    return None;
-                }
-                self.join_data.job_id = value;
+            if let Some(job_id) = data.job_id {
+                match data.status {
+                    0 => {
+                        // User is in a universe place which isn't the root place
+                        let stripped_data: &str = &job_id[9..job_id.len()];
+                        let split_data: Vec<&str> = stripped_data.split(";").collect();
+                        let received_place_id: u64 = split_data[0].parse().unwrap();
+                        
+                        if self.join_data.place_id != received_place_id {
+                            self.join_data.place_id = received_place_id;
+                            let res = reqwest::blocking::get(&format!(
+                                "https://api.roblox.com/Marketplace/ProductInfo?assetId={}",
+                                &self.join_data.place_id
+                            ))
+                            .unwrap();
+                            if res.status().is_success() {
+                                let data = res.text().unwrap();
+                                let json_data: Value = serde_json::from_str(&data).unwrap();
+                                self.join_data.place_name = match &json_data["Name"] {
+                                    Value::String(value) => value.to_string(),
+                                    _ => "Unknown Game".to_string(),
+                                }
+                            }
+                        }
+                        
+                        self.join_data.job_id = String::default();
+                        self.server_hidden = true;
+                        return Some(self);
+                    },
+                    12 => {
+                        // User is not authorized to join their own game.
+                        // This usually occurs when the user is playing on a VIP server
+                        let stripped_data: &str = &job_id[9..job_id.len()];
+                        let split_data: Vec<&str> = stripped_data.split(";").collect();
+                        let received_place_id: u64 = split_data[0].parse().unwrap();
 
-                let join_url = log_fail!(data.join_script_url.ok_or("Failed to get join script url")).to_string();
-                let parsed_url = Url::parse(&join_url).unwrap();
-                let query: HashMap<String, String> = parsed_url.query_pairs().into_owned().collect();
-                let json_data: Value = serde_json::from_str(&query.get("ticket").unwrap()).unwrap();
+                        if self.join_data.place_id != received_place_id {
+                            self.join_data.place_id = received_place_id;
+                            let res = reqwest::blocking::get(&format!(
+                                "https://api.roblox.com/Marketplace/ProductInfo?assetId={}",
+                                &self.join_data.place_id
+                            ))
+                            .unwrap();
+                            if res.status().is_success() {
+                                let data = res.text().unwrap();
+                                let json_data: Value = serde_json::from_str(&data).unwrap();
+                                self.join_data.place_name = match &json_data["Name"] {
+                                    Value::String(value) => value.to_string(),
+                                    _ => "Unknown Game".to_string(),
+                                }
+                            }
+                        }
 
-                self.join_data.place_id = match &json_data["PlaceId"] {
-                    Value::Number(value) => value.as_u64().unwrap(),
-                    _ => 0,
-                };
-
-                let res = reqwest::blocking::get(&format!(
-                    "https://api.roblox.com/Marketplace/ProductInfo?assetId={}",
-                    &self.join_data.place_id
-                ))
-                .unwrap();
-                if res.status().is_success() {
-                    let data = res.text().unwrap();
-                    let json_data: Value = serde_json::from_str(&data).unwrap();
-                    self.join_data.place_name = match &json_data["Name"] {
-                        Value::String(value) => value.to_string(),
-                        _ => "Unknown Game".to_string(),
+                        if self.join_data.job_id != split_data[1] {
+                            self.join_data.job_id = split_data[1].to_string();
+                        }
+                        
+                        self.server_hidden = true;
+                        return Some(self);
+                    },
+                    _ => {
+                        if self.join_data.job_id != job_id {
+                            self.join_data.job_id = job_id;
+                        };
+        
+                        let join_url = log_fail!(data.join_script_url.ok_or("Failed to get join script url")).to_string();
+                        let parsed_url = Url::parse(&join_url).unwrap();
+                        let query: HashMap<String, String> = parsed_url.query_pairs().into_owned().collect();
+                        let json_data: Value = serde_json::from_str(&query.get("ticket").unwrap()).unwrap();
+                        let place_id: u64 = match &json_data["PlaceId"] {
+                            Value::Number(value) => value.as_u64().unwrap(),
+                            _ => {
+                                return None; 
+                            }
+                        };
+                        
+                        if self.join_data.place_id != place_id {
+                            self.join_data.place_id = place_id;
+                            let res = reqwest::blocking::get(&format!(
+                                "https://api.roblox.com/Marketplace/ProductInfo?assetId={}",
+                                &self.join_data.place_id
+                            ))
+                            .unwrap();
+                            if res.status().is_success() {
+                                let data = res.text().unwrap();
+                                let json_data: Value = serde_json::from_str(&data).unwrap();
+                                self.join_data.place_name = match &json_data["Name"] {
+                                    Value::String(value) => value.to_string(),
+                                    _ => "Unknown Game".to_string(),
+                                }
+                            }
+                        }
+                        
+                        self.server_hidden = false;
+                        return Some(self);
                     }
-                }
-                return Some(self);
+                };
             }
             return None;
         }

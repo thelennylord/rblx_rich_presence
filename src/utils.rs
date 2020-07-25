@@ -34,7 +34,21 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
         // check the game the user is in
         let updated = rblx.update_game_info();
         if updated.is_none() {
-            println!("WARN: Could not find the game you're, so Discord join invites are disabled until we find it");
+            println!("WARN: Couldn't find the game you're in, so Discord join invites are disabled until it's found");
+            let presence = RichPresenceBuilder::new()
+                .state("In a game")
+                .details(&rblx.join_data.place_name)
+                .large_image_key("logo")
+                .large_image_text(&large_image_text)
+                .small_image_key("play_status")
+                .small_image_text(&rblx.join_data.place_name)
+                .start_time(now)
+                .build();
+            crate::log_fail!(discord.update_presence(presence));
+            return;
+        }
+
+        if rblx.server_hidden {
             let presence = RichPresenceBuilder::new()
                 .state("In a game")
                 .details(&rblx.join_data.place_name)
@@ -49,10 +63,10 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
         }
 
         // usual checks
-        let srv_info = &rblx.get_server_info();
+        let server_info = rblx.get_server_info();
 
-        if srv_info.id == "0" {
-            println!("WARN: Could not find the server you are in, so Discord join invites are disabled until we find it");
+        if server_info.is_none() {
+            println!("WARN: Couldn't find the server you're in, so Discord join invites are disabled until it's found");
             let presence = RichPresenceBuilder::new()
                 .state("In a game")
                 .details(&rblx.join_data.place_name)
@@ -63,29 +77,30 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
                 .start_time(now)
                 .build();
             crate::log_fail!(&discord.update_presence(presence));
-            return;
+        } else {
+            let server_info = server_info.unwrap();
+            let join_secret = format!(
+                "{{\"place_id\": {}, \"job_id\": \"{}\"}}",
+                &rblx.join_data.place_id, &rblx.join_data.job_id
+            );
+            let presence = RichPresenceBuilder::new()
+                .state("In a game")
+                .details(&rblx.join_data.place_name)
+                .large_image_key("logo")
+                .large_image_text(&large_image_text)
+                .small_image_key("play_status")
+                .small_image_text(&rblx.join_data.place_name)
+                .party_id(&rblx.join_data.job_id)
+                .start_time(now)
+                .party_size(server_info.playing.unwrap_or(1))
+                .party_max(server_info.max_players)
+                .join_secret(&encode(join_secret))
+                .build();
+            crate::log_fail!(&discord.update_presence(presence));
         }
 
-        let join_secret = format!(
-            "{{\"place_id\": {}, \"job_id\": \"{}\"}}",
-            &rblx.join_data.place_id, &rblx.join_data.job_id
-        );
-        let presence = RichPresenceBuilder::new()
-            .state("In a game")
-            .details(&rblx.join_data.place_name)
-            .large_image_key("logo")
-            .large_image_text(&large_image_text)
-            .small_image_key("play_status")
-            .small_image_text(&rblx.join_data.place_name)
-            .party_id(&rblx.join_data.job_id)
-            .start_time(now)
-            .party_size(srv_info.playing.unwrap_or(1))
-            .party_max(srv_info.max_players)
-            .join_secret(&encode(join_secret))
-            .build();
-        crate::log_fail!(&discord.update_presence(presence));
     } else {
-        &discord.clear_presence();
+        discord.clear_presence();
     }
 }
 
@@ -117,7 +132,7 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
         .join("config.toml");
     let prev_time = Arc::new(Mutex::new(0 as u64));
     let thread2_disc = disc.clone();
-    let thread2_rblx = rblx;//.clone();
+    let thread2_rblx = rblx;
     let thread_prev_time = Arc::clone(&prev_time);
     thread::spawn(move || loop {
         let metadata = crate::log_fail!(std::fs::metadata(&config_path));
@@ -243,7 +258,6 @@ pub fn set_config(config: &Config) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-//#[allow(unused_macros)]
 #[macro_export]
 macro_rules! log_fail {
     ($res:expr) => {
