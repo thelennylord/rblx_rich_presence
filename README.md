@@ -1,5 +1,12 @@
-# Roblox Rich Presence
-Adds Discord rich presence support to Roblox
+<h1 align="center">
+    Roblox Rich Presence
+</h1>
+<div align="center">
+    <a href="https://github.com/thelennylord/rblx_rich_presence/actions"><img src="https://github.com/thelennylord/rblx_rich_presence/workflows/Rust/badge.svg" alt="Rust"></a>
+</div>
+<div align="center">
+    Adds Discord rich presence support to Roblox
+</div><hr>
 
 ## Features
 - Display the game you're currently playing
