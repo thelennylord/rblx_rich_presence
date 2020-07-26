@@ -8,11 +8,43 @@ use models::*;
 use rustcord::{RichPresenceBuilder, Rustcord};
 use std::env;
 use std::time::SystemTime;
+use std::io::{stdout, Write};
 use sysinfo::{ProcessExt, Signal, SystemExt};
 use winreg::{enums, RegKey};
+use serde_json::Value;
+
+// Checks if the current version of rblx_rich_presence is latest
+fn is_latest_version() -> bool {
+    let client = reqwest::blocking::Client::new();
+    let res = client
+        .get("https://api.github.com/repos/thelennylord/rblx_rich_presence/tags")
+        .header(reqwest::header::USER_AGENT, "rblx_rich_presence")
+        .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
+        .send()
+        .unwrap();
+    
+    if res.status().is_success() {
+        let data = res.text().unwrap();
+        let tags: Vec<Value> = serde_json::from_str(&data).unwrap();
+
+        if let Some(tag) = tags.first() {
+            if tag["name"].as_str().unwrap() == format!("v{}", env!("CARGO_PKG_VERSION")) {
+                return true;
+            }
+        }
+    } else {
+        println!("WARN: Could not fetch version; Received status code {:#?}", res.status());
+    }
+    false
+}
 
 fn main() {
-    println!("Roblox Rich Presence v{}\n", env!("CARGO_PKG_VERSION"));
+    println!("Roblox Rich Presence v{}", env!("CARGO_PKG_VERSION"));
+    if is_latest_version() {
+        stdout().write_all(b"\n").unwrap();
+    } else {
+        println!("A new version of Roblox Rich Presence is available!\nDownload the latest release from https://github.com/thelennylord/rblx_rich_presence/releases\n");
+    }
 
     // Close all instances of Roblox if open
     let system = sysinfo::System::new_all();
