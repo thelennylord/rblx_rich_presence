@@ -6,7 +6,8 @@
 </div>
 <div align="center">
     Adds Discord rich presence support to Roblox
-</div><hr>
+</div>
+<div>&nbsp;</div>
 
 ## Features
 - Display the game you're currently playing
