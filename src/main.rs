@@ -57,9 +57,9 @@ fn main() {
         process.kill(Signal::Kill);
     }
 
-    println!("Opening config.toml...");
+    println!("Loading config.toml...");
     let mut config = log_fail!(utils::get_config(), "Error occurred while reading config.toml.");
-    println!("Opened config.toml");
+    println!("Loaded config.toml");
     
     // Extract Roblox path and save it to config, and replace URL Protocol command with rblx_rich_presence.exe
     let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);

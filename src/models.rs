@@ -12,10 +12,28 @@ pub struct Config {
     pub presence: PresenceConfig,
 }
 
+impl Config {
+    pub fn default() -> Self {
+        Self {
+            general: GeneralConfig::default(),
+            presence: PresenceConfig::default()
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GeneralConfig {
     pub roblox: String,
     pub roblosecurity: String,
+}
+
+impl GeneralConfig {
+    pub fn default() -> Self {
+        GeneralConfig {
+            roblox: String::default(),
+            roblosecurity: String::default()
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -23,6 +41,16 @@ pub struct PresenceConfig {
     pub show_username: bool,
     pub show_presence: bool,
     pub update_interval: u64,
+}
+
+impl PresenceConfig {
+    pub fn default() -> Self {
+        PresenceConfig {
+            show_username: false,
+            show_presence: true,
+            update_interval: 30
+        }
+    }
 }
 
 #[derive(Deserialize, Debug)]

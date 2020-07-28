@@ -216,19 +216,20 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
 
     crate::log_fail!(tray_tx.send(true));
     crate::log_fail!(rx.recv());
-    println!("Roblox shut down");
+    println!("Roblox has shut down");
 }
 
 pub fn get_config() -> Result<Config, std::io::Error> {
     let dir = std::env::current_exe()?;
-    let err_msg = format!("Could not find config.toml at {:#?}", &dir);
+    let config_path = dir.parent().unwrap().join("config.toml");
+    if !config_path.exists() {
+        println!("WARN: Could not find config.toml; creating...");
+        crate::log_fail!(set_config(&Config::default()));
+    };
+
+    let err_msg = format!("ERROR: Could not find config.toml at {:#?}", &dir.parent());
     let mut file = crate::log_fail!(
-        File::open(
-            dir
-                .parent()
-                .unwrap()
-                .join("config.toml")
-        ),
+        File::open(config_path),
         err_msg
     );
 
@@ -236,7 +237,7 @@ pub fn get_config() -> Result<Config, std::io::Error> {
 
     crate::log_fail!(
         file.read_to_string(&mut buffer),
-        "Could not read config.toml"
+        "ERROR: Could not read config.toml"
     );
     let config: Config = toml::from_str(&buffer)?;
 
@@ -252,7 +253,7 @@ pub fn set_config(config: &Config) -> Result<(), std::io::Error> {
                 .unwrap()
                 .join("config.toml")
         ),
-        "Could not write to config.toml"
+        "ERROR: Could not write to config.toml"
     );
     file.write_all(config_toml.as_bytes())?;
     Ok(())
