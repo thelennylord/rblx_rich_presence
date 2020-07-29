@@ -9,6 +9,7 @@ use std::thread;
 use std::time;
 use url::Url;
 use winreg::{enums, RegKey};
+use reqwest::blocking::{Client, ClientBuilder};
 
 pub struct Roblox {
     pub join_data: RobloxJoinData,
@@ -105,10 +106,31 @@ impl Roblox {
         self
     }
 
+    /// Checks whether the .ROBLOSECURITY is valid or not
+    /// Returns true if valid, else returns false.
+    pub fn verify_roblosecurity(&self) -> bool {
+        let client: Client = ClientBuilder::new()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .unwrap();
+        let res = client.get("https://www.roblox.com/mobileapi/userinfo")
+            .header(header::COOKIE, format!(
+                ".ROBLOSECURITY={};path=/;domain=.roblox.com;",
+                self.roblosecurity
+            ))
+            .send()
+            .unwrap();
+        
+        if res.status().is_success() {
+            return true;
+        }
+        false
+    }
+
     /// Used to generate an one time authorization ticket.
     /// This ticket can be used to join games as the authorized user.
     pub fn generate_ticket(&self) -> Option<String> {
-        let client = reqwest::blocking::Client::new();
+        let client = Client::new();
 
         let mut x_csrf_token = String::default();
         let mut tries = 0;
@@ -256,7 +278,7 @@ impl Roblox {
     pub fn with_additional_info_from_request_type(mut self) -> Self {
         match &self.join_data.request.as_str() {
             &"RequestGame" | &"RequestGameJob" | &"RequestPrivateGame" => {
-                let client = reqwest::blocking::Client::new();
+                let client = Client::new();
                 loop {
                     let res = match client
                         .get(&self.join_data.place_launcher_url)
@@ -334,7 +356,7 @@ impl Roblox {
                 }
             }
             &"RequestFollowUser" => {
-                let client = reqwest::blocking::Client::new();
+                let client = Client::new();
 
                 let resp = client
                     .get(&self.join_data.place_launcher_url)
@@ -425,7 +447,7 @@ impl Roblox {
 
     pub fn get_server_info(&self) -> Option<RobloxServerData> {
         let mut next_cursor_page: String = String::default();
-        let client = reqwest::blocking::Client::new();
+        let client = Client::new();
 
         // Get total number of servers
         let res = client
@@ -482,7 +504,7 @@ impl Roblox {
             return Some(self);
         }
 
-        let client = reqwest::blocking::Client::new();
+        let client = Client::new();
         let url = format!("https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestFollowUser&browserTrackerId=0&userId={}", &self.join_data.user_id);
         let res = client.get(&url)
             .header(reqwest::header::USER_AGENT, "Roblox/WinInet")

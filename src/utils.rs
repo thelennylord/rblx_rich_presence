@@ -17,7 +17,7 @@ use sysinfo::{System, SystemExt};
 
 pub fn pause() {
     let mut stdout = stdout();
-    stdout.write_all(b"\nPress Enter to continue...").unwrap();
+    stdout.write_all(b"\nPress any key to continue...").unwrap();
     stdout.flush().unwrap();
     stdin().read_exact(&mut [0]).unwrap();
 }

@@ -91,8 +91,15 @@ fn main() {
             let rblx = roblox::Roblox::new()
             .with_roblosecurity(config.general.roblosecurity)
             .with_path(config.general.roblox)
-            .with_url(value)
-            .with_additional_info_from_request_type();
+            .with_url(value);
+            
+            if !rblx.verify_roblosecurity() {
+                println!("ERROR: Invalid .ROBLOSECURITY cookie in config.toml");
+                utils::pause();
+                std::process::exit(0);
+            }
+            
+            let rblx = rblx.with_additional_info_from_request_type();
             
             println!("Launching Roblox...");
             log_fail!(rblx.launch());

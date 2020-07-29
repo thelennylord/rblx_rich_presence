@@ -94,6 +94,13 @@ impl EventHandlers for DiscordEventHandler {
         let rblx = roblox::Roblox::new()
             .with_roblosecurity(config.general.roblosecurity)
             .with_path(config.general.roblox);
+
+        if !rblx.verify_roblosecurity() {
+            println!("ERROR: Invalid .ROBLOSECURITY cookie in config.toml");
+            utils::pause();
+            std::process::exit(0);
+        }
+        
         let join_data = roblox::RobloxJoinData {
             user_id: 0,
             username: String::new(),
