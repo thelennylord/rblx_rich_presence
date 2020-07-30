@@ -190,12 +190,19 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
                 if updated {
                     println!("Roblox has finished updating");
                     
+                    
                     // Registry values have been reset, so revert them back
                     let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);
                     let rblx_reg = crate::log_fail!(hkcr.open_subkey_with_flags(
                         r"Software\Classes\roblox-player\shell\open\command",
-                        enums::KEY_SET_VALUE,
+                        enums::KEY_ALL_ACCESS,
                     ));
+                    let value: String = crate::log_fail!(rblx_reg.get_value(""));
+                    if value.ends_with("RobloxPlayerLauncher.exe\" %1") {
+                        let mut config = crate::log_fail!(get_config());
+                        config.general.roblox = value[1..&value.len()-4].to_string();
+                        crate::log_fail!(set_config(&config));
+                    }
 
                     crate::log_fail!(rblx_reg.set_value("", &format!("\"{}\" \"%1\"", std::env::current_exe().unwrap().to_str().unwrap())));
                 }
@@ -205,7 +212,6 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
             } else {
                 println!("Could not find Roblox, shutting down...");
                 break;
-                //std::process::exit(0);
             }
             continue;
         }

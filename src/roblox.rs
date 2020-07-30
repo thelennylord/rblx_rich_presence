@@ -43,7 +43,7 @@ impl Roblox {
         // spawn RobloxPlayerLauncher.exe
         let mut rblx_launcher = Command::new(&self.path);
         &rblx_launcher.arg(&self.join_data.as_url());
-        if !rblx_launcher.status().unwrap().success() {
+        if !rblx_launcher.status()?.success() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Interrupted,
                 "RobloxPlayerLauncher.exe was interrupted",

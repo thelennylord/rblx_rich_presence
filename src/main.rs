@@ -89,9 +89,9 @@ fn main() {
         Some(value) => {
             println!("Connecting to Roblox...");
             let rblx = roblox::Roblox::new()
-            .with_roblosecurity(config.general.roblosecurity)
-            .with_path(config.general.roblox)
-            .with_url(value);
+                .with_roblosecurity(config.general.roblosecurity)
+                .with_path(config.general.roblox)
+                .with_url(value);
             
             if !rblx.verify_roblosecurity() {
                 println!("ERROR: Invalid .ROBLOSECURITY cookie in config.toml");
@@ -102,20 +102,20 @@ fn main() {
             let rblx = rblx.with_additional_info_from_request_type();
             
             println!("Launching Roblox...");
-            log_fail!(rblx.launch());
+            log_fail!(rblx.launch(), "ERROR: Roblox path specified is invalid; please update Roblox's path in config.toml.");
             println!("Launched Roblox\nLoading rich presence...");
             
             let join_data = rblx.get_join_data();
             let now = SystemTime::now();
             let presence = RichPresenceBuilder::new()
-            .state("In a game")
-            .details(&join_data.place_name)
-            .large_image_key("logo")
-            .large_image_text("Playing ROBLOX")
-            .small_image_key("play_status")
-            .small_image_text(&join_data.place_name)
-            .start_time(now)
-            .build();
+                .state("In a game")
+                .details(&join_data.place_name)
+                .large_image_key("logo")
+                .large_image_text("Playing ROBLOX")
+                .small_image_key("play_status")
+                .small_image_text(&join_data.place_name)
+                .start_time(now)
+                .build();
             log_fail!(discord.update_presence(presence));
             utils::watch(discord, rblx, now);
         }
@@ -149,7 +149,7 @@ fn main() {
                 .with_url(join_url)
                 .with_additional_info_from_request_type();
             println!("Launching Roblox...");
-            log_fail!(rblx.launch());
+            log_fail!(rblx.launch(), "ERROR: Roblox path specified is invalid; please update Roblox's path in config.toml.");
             println!("Launched Roblox\nLoading rich presence...");
 
             let join_data = rblx.get_join_data();
