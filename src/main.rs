@@ -7,6 +7,7 @@ mod tray_menu;
 use models::*;
 use rustcord::{RichPresenceBuilder, Rustcord};
 use std::env;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use std::io::{stdout, Write};
 use sysinfo::{ProcessExt, Signal, SystemExt};
@@ -46,27 +47,39 @@ fn main() {
         println!("A new version of Roblox Rich Presence is available!\nDownload the latest release from https://github.com/thelennylord/rblx_rich_presence/releases\n");
     }
 
+    
+    println!("Loading config.toml...");
+    let mut config = log_fail!(utils::get_config(), "Error occurred while reading config.toml.");
+    println!("Loaded config.toml");
+    
     // Close all instances of Roblox if open
     let system = sysinfo::System::new_all();
     for process in system.get_process_by_name("RobloxPlayerBeta.exe") {
         println!("Found another instance of Roblox opened, killing it...");
         process.kill(Signal::Kill);
     }
-    for process in system.get_process_by_name("RobloxPlayerLauncher.exe") {
-        println!("Found another instance of Roblox opened, killing it...");
-        process.kill(Signal::Kill);
+    
+    if config.general.roblox.is_empty() {
+        for process in system.get_process_by_name("RobloxPlayerLauncher.exe") {
+            println!("Found another instance of Roblox opened, killing it...");
+            process.kill(Signal::Kill);
+        }
+    } else {
+        let file_name: &str = Path::new(&config.general.roblox).file_name().unwrap().to_str().unwrap();
+        for process in system.get_process_by_name(file_name) {
+            println!("Found another instance of Roblox opened, killing it...");
+            process.kill(Signal::Kill);
+        }
     }
-
-    println!("Loading config.toml...");
-    let mut config = log_fail!(utils::get_config(), "Error occurred while reading config.toml.");
-    println!("Loaded config.toml");
     
     // Extract Roblox path and save it to config, and replace URL Protocol command with rblx_rich_presence.exe
     let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);
     let rblx_reg = log_fail!(hkcr.open_subkey_with_flags(r"Software\Classes\roblox-player\shell\open\command", enums::KEY_ALL_ACCESS));
     let value: String = log_fail!(rblx_reg.get_value(""));
     
-    if value.ends_with("RobloxPlayerLauncher.exe\" %1") {
+    let exe_dir: PathBuf = env::current_exe().unwrap();
+    let exe_name: &str = exe_dir.file_name().unwrap().to_str().unwrap();
+    if !value.ends_with(&format!("{}\" \"%1\"", exe_name)) {
         config.general.roblox = value[1..&value.len()-4].to_string();
         log_fail!(utils::set_config(&config));
     }

@@ -10,7 +10,9 @@ use std::io::{stdin, stdout, Read, Write};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::path::{Path, PathBuf};
 use std::time;
+use std::env;
 use std::time::SystemTime;
 use winreg::{enums, RegKey};
 use sysinfo::{System, SystemExt};
@@ -125,7 +127,7 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
     });
 
     // Config watcher thread
-    let config_path = std::env::current_exe()
+    let config_path = env::current_exe()
         .unwrap()
         .parent()
         .unwrap()
@@ -170,10 +172,12 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
                 // Check whether Roblox is updating by starting a loop which will check whether the launcher is opened
                 let mut updated: bool = false;
                 let mut update_msg_shown: bool = false;
+                let mut config = crate::log_fail!(get_config());
                 loop {
                     system.refresh_all();
-
-                    if system.get_process_by_name("RobloxPlayerLauncher.exe").is_empty() {
+                    
+                    let launcher_name: &str = Path::new(&config.general.roblox).file_name().unwrap().to_str().unwrap();
+                    if system.get_process_by_name(launcher_name).is_empty() {
                         // Roblox is not updating, break out of the loop
                         break;
                     }
@@ -198,13 +202,14 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
                         enums::KEY_ALL_ACCESS,
                     ));
                     let value: String = crate::log_fail!(rblx_reg.get_value(""));
-                    if value.ends_with("RobloxPlayerLauncher.exe\" %1") {
-                        let mut config = crate::log_fail!(get_config());
+                    let exe_dir: PathBuf = env::current_exe().unwrap();
+                    let exe_name: &str = exe_dir.file_name().unwrap().to_str().unwrap();
+                    if !value.ends_with(&format!("{}\" \"%1\"", exe_name)) {
                         config.general.roblox = value[1..&value.len()-4].to_string();
                         crate::log_fail!(set_config(&config));
                     }
 
-                    crate::log_fail!(rblx_reg.set_value("", &format!("\"{}\" \"%1\"", std::env::current_exe().unwrap().to_str().unwrap())));
+                    crate::log_fail!(rblx_reg.set_value("", &format!("\"{}\" \"%1\"", env::current_exe().unwrap().to_str().unwrap())));
                 }
 
                 tries += 1;
@@ -226,7 +231,7 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
 }
 
 pub fn get_config() -> Result<Config, std::io::Error> {
-    let dir = std::env::current_exe()?;
+    let dir = env::current_exe()?;
     let config_path = dir.parent().unwrap().join("config.toml");
     if !config_path.exists() {
         println!("WARN: Could not find config.toml; creating...");
@@ -254,7 +259,7 @@ pub fn set_config(config: &Config) -> Result<(), std::io::Error> {
     let config_toml = crate::log_fail!(toml::to_string_pretty(&config));
     let mut file = crate::log_fail!(
         File::create(
-            std::env::current_exe()?
+            env::current_exe()?
                 .parent()
                 .unwrap()
                 .join("config.toml")

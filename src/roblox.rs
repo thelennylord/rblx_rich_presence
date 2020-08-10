@@ -5,6 +5,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::process::Command;
+use std::path::Path;
 use std::thread;
 use std::time;
 use url::Url;
@@ -40,13 +41,13 @@ impl Roblox {
         // prevents roblox from installing again, which we don't want
         rblx_reg.set_value("", &format!("\"{}\" %1", &self.path))?;
 
-        // spawn RobloxPlayerLauncher.exe
+        // spawn Roblox Launcher
         let mut rblx_launcher = Command::new(&self.path);
         &rblx_launcher.arg(&self.join_data.as_url());
         if !rblx_launcher.status()?.success() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Interrupted,
-                "RobloxPlayerLauncher.exe was interrupted",
+                format!("{} was interrupted", Path::new(&self.path).file_name().unwrap().to_str().unwrap()),
             ));
         }
         loop {
