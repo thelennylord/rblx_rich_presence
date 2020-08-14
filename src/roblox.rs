@@ -1,5 +1,6 @@
 use crate::log_fail;
 use crate::utils::pause;
+use crate::utils::{get_config, set_config};
 use reqwest::header;
 use serde::Deserialize;
 use serde_json::Value;
@@ -126,6 +127,31 @@ impl Roblox {
             return true;
         }
         false
+    }
+
+    /// Uses Roblox Authentication Ticket to get .ROLOSECURITY
+    pub fn generate_and_save_roblosecurity(&self) {
+        let client = Client::new();
+        let mut body = HashMap::new();
+        body.insert("authenticationTicket", &self.join_data.game_info);
+        let res = client.post("https://auth.roblox.com/v1/authentication-ticket/redeem")
+            .header(header::USER_AGENT, "RobloxStudio/WinInet")
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::ACCEPT, "application/json")
+            .header("RBXAuthenticationNegotiation", "https://www.roblox.com")
+            .json(&body)
+            .send()
+            .unwrap();
+        
+        if res.status().is_success() {
+            let set_cookie_headers = res.headers().get(header::SET_COOKIE);
+            let raw_roblosecurity: &str = set_cookie_headers.iter().next().unwrap().to_str().unwrap();
+            let roblosecurity: &str = &raw_roblosecurity[15..raw_roblosecurity.find(';').unwrap()];
+            let mut config = get_config().unwrap();
+            
+            config.general.roblosecurity = roblosecurity.to_string();
+            log_fail!(set_config(&config));
+        }
     }
 
     /// Used to generate an one time authorization ticket.

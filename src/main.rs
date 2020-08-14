@@ -101,11 +101,13 @@ fn main() {
     match env::args().nth(1) {
         Some(value) => {
             println!("Connecting to Roblox...");
-            let rblx = roblox::Roblox::new()
+            let mut rblx = roblox::Roblox::new()
                 .with_roblosecurity(config.general.roblosecurity)
                 .with_path(config.general.roblox)
                 .with_url(value);
-            
+            rblx.generate_and_save_roblosecurity();
+            rblx.join_data.game_info = log_fail!(rblx.generate_ticket().ok_or("Could not generate auth ticket"));
+
             if !rblx.verify_roblosecurity() {
                 println!("ERROR: Invalid .ROBLOSECURITY cookie in config.toml");
                 utils::pause();
@@ -156,11 +158,14 @@ fn main() {
                 None
             ));
 
-            let rblx = roblox::Roblox::new()
+            let mut rblx = roblox::Roblox::new()
                 .with_roblosecurity(config.general.roblosecurity)
                 .with_path(config.general.roblox)
                 .with_url(join_url)
                 .with_additional_info_from_request_type();
+            rblx.generate_and_save_roblosecurity();
+            rblx.join_data.game_info = log_fail!(rblx.generate_ticket().ok_or("Could not generate auth ticket"));
+
             println!("Launching Roblox...");
             log_fail!(rblx.launch(), "ERROR: Roblox path specified is invalid; please update Roblox's path in config.toml.");
             println!("Launched Roblox\nLoading rich presence...");
