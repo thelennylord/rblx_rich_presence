@@ -13,6 +13,8 @@ use std::io::{stdout, Write};
 use sysinfo::{ProcessExt, Signal, SystemExt};
 use winreg::{enums, RegKey};
 use serde_json::Value;
+use winapi::um::{winuser::SetWindowTextW, wincon::GetConsoleWindow};
+use tray_menu::wide_str;
 
 // Checks if the current version of rblx_rich_presence is latest
 fn is_latest_version() -> bool {
@@ -40,6 +42,10 @@ fn is_latest_version() -> bool {
 }
 
 fn main() {
+    unsafe {
+        SetWindowTextW(GetConsoleWindow(), wide_str("Roblox Rich Presence").as_ptr());
+    };
+
     println!("Roblox Rich Presence v{}", env!("CARGO_PKG_VERSION"));
     if is_latest_version() {
         stdout().write_all(b"\n").unwrap();

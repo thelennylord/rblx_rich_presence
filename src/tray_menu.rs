@@ -31,7 +31,7 @@ use winapi::{
         winuser::{
             WM_APP, WM_LBUTTONUP, WM_RBUTTONUP, WM_GETICON, GetCursorPos, CreatePopupMenu, AppendMenuW, DefWindowProcW, WNDCLASSEXW,
             MF_STRING, MF_GRAYED, GetMessageW, TPM_RETURNCMD, TPM_TOPALIGN, TPM_LEFTALIGN, MF_SEPARATOR, MF_POPUP, MF_CHECKED, MF_UNCHECKED,
-            SendMessageW, ICON_SMALL2
+            SendMessageW, ICON_SMALL2, MF_BYCOMMAND, SC_CLOSE
         }
     }
 };
@@ -44,7 +44,7 @@ struct SafeNID {
 
 unsafe impl Send for SafeNID {}
 
-fn wide_str(str: &str) -> Vec<u16> {
+pub fn wide_str(str: &str) -> Vec<u16> {
     OsStr::new(str)
     .encode_wide()
     .chain(Some(0).into_iter())
@@ -163,6 +163,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, u_msg: UINT, w_param: WPARAM, 
 }
 
 pub unsafe fn start(tx: Sender<Sender<bool>>) {
+    let con = GetConsoleWindow();
     let wcex = WNDCLASSEXW {
         cbSize: size_of::<WNDCLASSEXW>() as u32,
         style: 0,
@@ -224,7 +225,7 @@ pub unsafe fn start(tx: Sender<Sender<bool>>) {
         hBalloonIcon: 0 as HICON,
     };
     
-    let hicon = SendMessageW(GetConsoleWindow(), WM_GETICON, ICON_SMALL2 as usize, 0 as isize);
+    let hicon = SendMessageW(con, WM_GETICON, ICON_SMALL2 as usize, 0 as isize);
     if hicon != 0 {
         nid.hIcon = hicon as HICON;
     }
@@ -255,7 +256,9 @@ pub unsafe fn start(tx: Sender<Sender<bool>>) {
         nid
     };
 
-    winuser::ShowWindow(GetConsoleWindow(), 0);
+    let hmenu = winuser::GetSystemMenu(con, 0);
+    winuser::DeleteMenu(hmenu, SC_CLOSE as u32, MF_BYCOMMAND);
+    winuser::ShowWindow(con, 0);
 
     std::thread::spawn(move || loop {
         if rx.try_recv().is_ok() {
