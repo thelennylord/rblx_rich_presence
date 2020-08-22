@@ -39,6 +39,7 @@ impl GeneralConfig {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PresenceConfig {
     pub show_username: bool,
+    pub show_game: bool,
     pub show_presence: bool,
     pub update_interval: u64,
 }
@@ -48,6 +49,7 @@ impl PresenceConfig {
         PresenceConfig {
             show_username: false,
             show_presence: true,
+            show_game: true,
             update_interval: 30
         }
     }

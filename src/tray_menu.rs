@@ -57,9 +57,10 @@ unsafe extern "system" fn window_proc(hwnd: HWND, u_msg: UINT, w_param: WPARAM, 
     const MENU_LABEL: u32 = WM_APP + 2;
     const MENU_OPTIONS: u32 = WM_APP + 3;
     const OPTIONS_USERNAME: u32 = MENU_OPTIONS + 1;
-    const OPTIONS_PRESENCE: u32 = MENU_OPTIONS + 2;
-    const MENU_DEBUG: u32 = WM_APP + 6;
-    const MENU_EXIT: u32 = WM_APP + 7;
+    const OPTIONS_GAME: u32 = MENU_OPTIONS + 2;
+    const OPTIONS_PRESENCE: u32 = MENU_OPTIONS + 3;
+    const MENU_DEBUG: u32 = WM_APP + 7;
+    const MENU_EXIT: u32 = WM_APP + 8;
     
     
     match u_msg {
@@ -85,6 +86,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, u_msg: UINT, w_param: WPARAM, 
                 let options_popup = CreatePopupMenu();
                 
                 AppendMenuW(options_popup, MF_STRING| (if config.presence.show_username {MF_CHECKED} else {MF_UNCHECKED}), OPTIONS_USERNAME as usize, wide_str("Show username").as_ptr());
+                AppendMenuW(options_popup, MF_STRING| (if config.presence.show_game {MF_CHECKED} else {MF_UNCHECKED}), OPTIONS_GAME as usize, wide_str("Show game").as_ptr());
                 AppendMenuW(options_popup, MF_STRING| (if config.presence.show_presence {MF_CHECKED} else {MF_UNCHECKED}), OPTIONS_PRESENCE as usize, wide_str("Show presence").as_ptr());
                 AppendMenuW(main_popup, MF_POPUP, options_popup as usize, wide_str("Options...").as_ptr());
                 
@@ -101,6 +103,10 @@ unsafe extern "system" fn window_proc(hwnd: HWND, u_msg: UINT, w_param: WPARAM, 
                 match result as u32 {
                     OPTIONS_USERNAME => {
                         config.presence.show_username = !config.presence.show_username;
+                        log_fail!(set_config(&config));
+                    },
+                    OPTIONS_GAME => {
+                        config.presence.show_game = !config.presence.show_game;
                         log_fail!(set_config(&config));
                     },
                     OPTIONS_PRESENCE => {
