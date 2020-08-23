@@ -19,7 +19,7 @@ use sysinfo::{System, SystemExt};
 
 pub fn pause() {
     let mut stdout = stdout();
-    stdout.write_all(b"\nPress any key to continue...").unwrap();
+    stdout.write_all(b"Press any key to continue...").unwrap();
     stdout.flush().unwrap();
     stdin().read_exact(&mut [0]).unwrap();
 }
@@ -48,7 +48,7 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
                 .small_image_text(if config.presence.show_game {&rblx.join_data.place_name} else {""})
                 .start_time(now)
                 .build();
-            crate::log_fail!(discord.update_presence(presence));
+            discord.update_presence(presence).unwrap();
             return;
         }
 
@@ -62,7 +62,7 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
                 .small_image_text(if config.presence.show_game {&rblx.join_data.place_name} else {""})
                 .start_time(now)
                 .build();
-            crate::log_fail!(&discord.update_presence(presence));
+            discord.update_presence(presence).unwrap();
             return;
         }
 
@@ -80,7 +80,7 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
                 .small_image_text(if config.presence.show_game {&rblx.join_data.place_name} else {""})
                 .start_time(now)
                 .build();
-            crate::log_fail!(&discord.update_presence(presence));
+            discord.update_presence(presence).unwrap();
         } else {
             let server_info = server_info.unwrap();
             let join_secret = format!(
@@ -100,7 +100,7 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
                 .party_max(server_info.max_players)
                 .join_secret(&encode(join_secret))
                 .build();
-            crate::log_fail!(&discord.update_presence(presence));
+            discord.update_presence(presence).unwrap();
         }
 
     } else {
@@ -123,7 +123,7 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
     let thread_disc = disc.clone();
     let thread_rblx = rblx.clone();
     thread::spawn(move || loop {
-        let config = crate::log_fail!(get_config());
+        let config = get_config().unwrap();
         update_presence(&config, &thread_disc, &thread_rblx, now);
         thread::sleep(time::Duration::from_secs(config.presence.update_interval));
     });
@@ -139,7 +139,7 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
     let thread2_rblx = rblx;
     let thread_prev_time = Arc::clone(&prev_time);
     thread::spawn(move || loop {
-        let metadata = crate::log_fail!(std::fs::metadata(&config_path));
+        let metadata = std::fs::metadata(&config_path).unwrap();
         if let Ok(time) = metadata.modified() {
             let since_epoch = time
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -149,7 +149,7 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
             if *prev_time == 0 {
                 *prev_time = since_epoch;
             } else if since_epoch != *prev_time {
-                let config = crate::log_fail!(get_config());
+                let config = get_config().unwrap();
                 update_presence(&config, &thread2_disc, &thread2_rblx, now);
                 *prev_time = since_epoch;
                 println!("config.toml updated; updating rich presence");
@@ -174,7 +174,7 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
                 // Check whether Roblox is updating by starting a loop which will check whether the launcher is opened
                 let mut updated: bool = false;
                 let mut update_msg_shown: bool = false;
-                let mut config = crate::log_fail!(get_config());
+                let mut config = get_config().unwrap();
                 loop {
                     system.refresh_all();
                     
@@ -199,19 +199,19 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
                     
                     // Registry values have been reset, so revert them back
                     let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);
-                    let rblx_reg = crate::log_fail!(hkcr.open_subkey_with_flags(
+                    let rblx_reg = hkcr.open_subkey_with_flags(
                         r"Software\Classes\roblox-player\shell\open\command",
                         enums::KEY_ALL_ACCESS,
-                    ));
-                    let value: String = crate::log_fail!(rblx_reg.get_value(""));
+                    ).unwrap();
+                    let value: String = rblx_reg.get_value("").unwrap();
                     let exe_dir: PathBuf = env::current_exe().unwrap();
                     let exe_name: &str = exe_dir.file_name().unwrap().to_str().unwrap();
                     if !value.ends_with(&format!("{}\" \"%1\"", exe_name)) {
                         config.general.roblox = value[1..&value.len()-4].to_string();
-                        crate::log_fail!(set_config(&config));
+                        set_config(&config).unwrap();
                     }
 
-                    crate::log_fail!(rblx_reg.set_value("", &format!("\"{}\" \"%1\"", env::current_exe().unwrap().to_str().unwrap())));
+                    rblx_reg.set_value("", &format!("\"{}\" \"%1\"", env::current_exe().unwrap().to_str().unwrap())).unwrap();
                 }
 
                 tries += 1;
@@ -227,8 +227,8 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
 
     disc.clear_presence();
 
-    crate::log_fail!(tray_tx.send(true));
-    crate::log_fail!(rx.recv());
+    tray_tx.send(true).unwrap();
+    rx.recv().unwrap();
     println!("Roblox has shut down");
 }
 
@@ -237,61 +237,27 @@ pub fn get_config() -> Result<Config, std::io::Error> {
     let config_path = dir.parent().unwrap().join("config.toml");
     if !config_path.exists() {
         println!("WARN: Could not find config.toml; creating...");
-        crate::log_fail!(set_config(&Config::default()));
+        set_config(&Config::default()).unwrap();
     };
 
-    let err_msg = format!("ERROR: Could not find config.toml at {:#?}", &dir.parent());
-    let mut file = crate::log_fail!(
-        File::open(config_path),
-        err_msg
-    );
+    let mut file = File::open(config_path).unwrap();
 
     let mut buffer: String = String::new();
 
-    crate::log_fail!(
-        file.read_to_string(&mut buffer),
-        "ERROR: Could not read config.toml"
-    );
+    file.read_to_string(&mut buffer).unwrap();
     let config: Config = toml::from_str(&buffer)?;
 
     Ok(config)
 }
 
 pub fn set_config(config: &Config) -> Result<(), std::io::Error> {
-    let config_toml = crate::log_fail!(toml::to_string_pretty(&config));
-    let mut file = crate::log_fail!(
-        File::create(
-            env::current_exe()?
-                .parent()
-                .unwrap()
-                .join("config.toml")
-        ),
-        "ERROR: Could not write to config.toml"
-    );
+    let config_toml = toml::to_string_pretty(&config).unwrap();
+    let mut file = File::create(
+        env::current_exe()?
+            .parent()
+            .unwrap()
+            .join("config.toml")
+    ).unwrap();
     file.write_all(config_toml.as_bytes())?;
     Ok(())
-}
-
-#[macro_export]
-macro_rules! log_fail {
-    ($res:expr) => {
-        match $res {
-            Ok(value) => value,
-            Err(value) => {
-                println!("An error ocurred:\n {:#?}", value);
-                crate::utils::pause();
-                std::process::exit(0);
-            }
-        }
-    };
-    ($res:expr, $custom:tt) => {
-        match $res {
-            Ok(value) => value,
-            Err(_) => {
-                println!("An error ocurred:\n {}", $custom);
-                crate::utils::pause();
-                std::process::exit(0);
-            }
-        }
-    };
 }

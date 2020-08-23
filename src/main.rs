@@ -7,6 +7,8 @@ mod tray_menu;
 use models::*;
 use rustcord::{RichPresenceBuilder, Rustcord};
 use std::env;
+use std::thread;
+use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use std::io::{stdout, Write};
@@ -42,6 +44,19 @@ fn is_latest_version() -> bool {
 }
 
 fn main() {
+    // Set up panic hook for better error handling
+    panic::set_hook(Box::new(|panic_info| {
+        let handle = thread::current();
+        println!("\n\n\
+        Well, this is awkward...\n\
+        Roblox Rich Presence encountered an issue and crashed.\n\
+        To help us diagnose and fix this issue, \
+        you may report it along with the below crash message at https://github.com/thelennylord/rblx_rich_presence/issues\n\n\
+        Crash message:\n\
+        thread '{}' {}", handle.name().unwrap_or("unknown"), panic_info);
+        utils::pause();
+    }));
+
     unsafe {
         SetWindowTextW(GetConsoleWindow(), wide_str("Roblox Rich Presence").as_ptr());
     };
@@ -55,7 +70,7 @@ fn main() {
 
     
     println!("Loading config.toml...");
-    let mut config = log_fail!(utils::get_config(), "Error occurred while reading config.toml.");
+    let mut config = utils::get_config().unwrap();
     println!("Loaded config.toml");
     
     // Close all instances of Roblox if open
@@ -80,29 +95,29 @@ fn main() {
     
     // Extract Roblox path and save it to config, and replace URL Protocol command with rblx_rich_presence.exe
     let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);
-    let rblx_reg = log_fail!(hkcr.open_subkey_with_flags(r"Software\Classes\roblox-player\shell\open\command", enums::KEY_ALL_ACCESS));
-    let value: String = log_fail!(rblx_reg.get_value(""));
+    let rblx_reg = hkcr.open_subkey_with_flags(r"Software\Classes\roblox-player\shell\open\command", enums::KEY_ALL_ACCESS).unwrap();
+    let value: String = rblx_reg.get_value("").unwrap();
     
     let exe_dir: PathBuf = env::current_exe().unwrap();
     let exe_name: &str = exe_dir.file_name().unwrap().to_str().unwrap();
     if !value.ends_with(&format!("{}\" \"%1\"", exe_name)) {
         config.general.roblox = value[1..&value.len()-4].to_string();
-        log_fail!(utils::set_config(&config));
+        utils::set_config(&config).unwrap();
     }
-    log_fail!(rblx_reg.set_value("", &format!("\"{}\" \"%1\"", log_fail!(std::env::current_exe()).to_str().unwrap())));
+    rblx_reg.set_value("", &format!("\"{}\" \"%1\"", std::env::current_exe().unwrap().to_str().unwrap())).unwrap();
     
     // Setup registry values for passing information
     // TODO: Find a more efficient way of doing it
-    let (rblx_rp_reg, _) = log_fail!(hkcr.create_subkey(r"Software\rblx_rich_presence"));
-    log_fail!(rblx_rp_reg.set_value("join_data", &""));
-    log_fail!(rblx_rp_reg.set_value("join_key", &""));
-    log_fail!(rblx_rp_reg.set_value("proceed", &"false"));
+    let (rblx_rp_reg, _) = hkcr.create_subkey(r"Software\rblx_rich_presence").unwrap();
+    rblx_rp_reg.set_value("join_data", &"").unwrap();
+    rblx_rp_reg.set_value("join_key", &"").unwrap();
+    rblx_rp_reg.set_value("proceed", &"false").unwrap();
     
-    let discord = log_fail!(Rustcord::init::<DiscordEventHandler>(
+    let discord = Rustcord::init::<DiscordEventHandler>(
         "725360592570941490",
         true,
         None
-    ));
+    ).unwrap();
     
     match env::args().nth(1) {
         Some(value) => {
@@ -112,7 +127,7 @@ fn main() {
                 .with_path(config.general.roblox)
                 .with_url(value);
             rblx.generate_and_save_roblosecurity();
-            rblx.join_data.game_info = log_fail!(rblx.generate_ticket().ok_or("Could not generate auth ticket"));
+            rblx.join_data.game_info = rblx.generate_ticket().ok_or("Could not generate auth ticket").unwrap();
 
             if !rblx.verify_roblosecurity() {
                 println!("ERROR: Invalid .ROBLOSECURITY cookie in config.toml");
@@ -123,7 +138,7 @@ fn main() {
             let rblx = rblx.with_additional_info_from_request_type();
             
             println!("Launching Roblox...");
-            log_fail!(rblx.launch(), "ERROR: Roblox path specified is invalid; please update Roblox's path in config.toml.");
+            rblx.launch().unwrap();
             println!("Launched Roblox\nLoading rich presence...");
             
             let join_data = rblx.get_join_data();
@@ -137,16 +152,16 @@ fn main() {
                 .small_image_text(&join_data.place_name)
                 .start_time(now)
                 .build();
-            log_fail!(discord.update_presence(presence));
+            discord.update_presence(presence).unwrap();
             utils::watch(discord, rblx, now);
         }
         None => {            
             let mut close = true;
             for _ in 0..20 {
                 std::thread::sleep(std::time::Duration::from_millis(500));
-                let proceed: String = log_fail!(rblx_rp_reg.get_value("proceed"));
+                let proceed: String = rblx_rp_reg.get_value("proceed").unwrap();
                 if proceed == "true" {
-                    log_fail!(rblx_rp_reg.set_value("proceed", &"false"));
+                    rblx_rp_reg.set_value("proceed", &"false").unwrap();
                     close = false;
                     break;
                 }
@@ -157,12 +172,12 @@ fn main() {
                 std::process::exit(0);
             }
             println!("Connecting to Roblox...");
-            let join_url: String = log_fail!(rblx_rp_reg.get_value("join_data"));
-            let discord = log_fail!(Rustcord::init::<DiscordEventHandler>(
+            let join_url: String = rblx_rp_reg.get_value("join_data").unwrap();
+            let discord = Rustcord::init::<DiscordEventHandler>(
                 "725360592570941490",
                 true,
                 None
-            ));
+            ).unwrap();
 
             let mut rblx = roblox::Roblox::new()
                 .with_roblosecurity(config.general.roblosecurity)
@@ -170,10 +185,10 @@ fn main() {
                 .with_url(join_url)
                 .with_additional_info_from_request_type();
             rblx.generate_and_save_roblosecurity();
-            rblx.join_data.game_info = log_fail!(rblx.generate_ticket().ok_or("Could not generate auth ticket"));
+            rblx.join_data.game_info = rblx.generate_ticket().ok_or("Could not generate auth ticket").unwrap();
 
             println!("Launching Roblox...");
-            log_fail!(rblx.launch(), "ERROR: Roblox path specified is invalid; please update Roblox's path in config.toml.");
+            rblx.launch().unwrap();
             println!("Launched Roblox\nLoading rich presence...");
 
             let join_data = rblx.get_join_data();
@@ -187,10 +202,10 @@ fn main() {
                 .small_image_text(&join_data.place_name)
                 .start_time(now)
                 .build();
-            log_fail!(rblx_rp_reg.set_value("join_data", &""));
-            log_fail!(rblx_rp_reg.set_value("join_key", &""));
+            rblx_rp_reg.set_value("join_data", &"").unwrap();
+            rblx_rp_reg.set_value("join_key", &"").unwrap();
 
-            log_fail!(discord.update_presence(presence));
+            discord.update_presence(presence).unwrap();
             utils::watch(discord, rblx, now);
         }
     }

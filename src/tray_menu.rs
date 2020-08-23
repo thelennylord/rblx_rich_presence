@@ -75,7 +75,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, u_msg: UINT, w_param: WPARAM, 
                     return 1;
                 }
 
-                let mut config = log_fail!(get_config());
+                let mut config = get_config().unwrap();
                 
                 let con = GetConsoleWindow();
                 let main_popup = CreatePopupMenu();
@@ -103,15 +103,15 @@ unsafe extern "system" fn window_proc(hwnd: HWND, u_msg: UINT, w_param: WPARAM, 
                 match result as u32 {
                     OPTIONS_USERNAME => {
                         config.presence.show_username = !config.presence.show_username;
-                        log_fail!(set_config(&config));
+                        set_config(&config).unwrap();
                     },
                     OPTIONS_GAME => {
                         config.presence.show_game = !config.presence.show_game;
-                        log_fail!(set_config(&config));
+                        set_config(&config).unwrap();
                     },
                     OPTIONS_PRESENCE => {
                         config.presence.show_presence = !config.presence.show_presence;
-                        log_fail!(set_config(&config));
+                        set_config(&config).unwrap();
                     },
                     MENU_DEBUG => {
                         if winuser::IsWindowVisible(con) == 0 {

@@ -1,4 +1,3 @@
-use crate::log_fail;
 use crate::utils::pause;
 use crate::utils::{get_config, set_config};
 use reqwest::header;
@@ -150,7 +149,7 @@ impl Roblox {
             let mut config = get_config().unwrap();
             
             config.general.roblosecurity = roblosecurity.to_string();
-            log_fail!(set_config(&config));
+            set_config(&config).unwrap();
         }
     }
 
@@ -193,7 +192,7 @@ impl Roblox {
                     403 => {
                         x_csrf_token = match ticket_res.headers().get("x-csrf-token") {
                             Some(value) => {
-                                let val = log_fail!(value.to_str());
+                                let val = value.to_str().unwrap();
                                 val.to_string()
                             }
 
@@ -225,7 +224,7 @@ impl Roblox {
             }
             let pair: Vec<String> = substr.split(":").map(|x| x.to_string()).collect();
             let mut value =
-                log_fail!(pair.get(1).ok_or("Failed to get an argument from url")).to_string();
+                pair.get(1).ok_or("Failed to get an argument from url").unwrap().to_string();
             match pair.get(0).unwrap().as_str() {
                 "launchmode" => {
                     options.insert("launchmode", value);
@@ -258,9 +257,10 @@ impl Roblox {
                 }
             }
         }
-        let placelauncherurl: &str = log_fail!(options
+        let placelauncherurl: &str = options
             .get("placelauncherurl")
-            .ok_or("Failed to get place launcher url"));
+            .ok_or("Failed to get place launcher url")
+            .unwrap();
         let parsed_url = Url::parse(placelauncherurl).unwrap();
         let query: HashMap<String, String> = parsed_url.query_pairs().into_owned().collect();
         RobloxJoinData {
@@ -343,7 +343,7 @@ impl Roblox {
                         }
 
                         let join_url = data.join_script_url.unwrap().to_string();
-                        let parsed_url = log_fail!(Url::parse(&join_url));
+                        let parsed_url = Url::parse(&join_url).unwrap();
                         let query: HashMap<String, String> =
                             parsed_url.query_pairs().into_owned().collect();
 
@@ -423,7 +423,8 @@ impl Roblox {
                         }
                     };
                     let join_url =
-                        log_fail!(data.join_script_url.ok_or("Failed to get join script url"))
+                        data.join_script_url.ok_or("Failed to get join script url")
+                            .unwrap()
                             .to_string();
                     let parsed_url = Url::parse(&join_url).unwrap();
                     let query: HashMap<String, String> =
@@ -612,7 +613,7 @@ impl Roblox {
                             self.join_data.job_id = job_id;
                         };
         
-                        let join_url = log_fail!(data.join_script_url.ok_or("Failed to get join script url")).to_string();
+                        let join_url = data.join_script_url.ok_or("Failed to get join script url").unwrap().to_string();
                         let parsed_url = Url::parse(&join_url).unwrap();
                         let query: HashMap<String, String> = parsed_url.query_pairs().into_owned().collect();
                         let json_data: Value = serde_json::from_str(&query.get("ticket").unwrap()).unwrap();

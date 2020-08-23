@@ -80,8 +80,8 @@ impl EventHandlers for DiscordEventHandler {
                 std::process::exit(1);
             }
         };
-        let json_str = log_fail!(str::from_utf8(&buff));
-        let data: DiscordJoinAccept = log_fail!(serde_json::from_str(&json_str));
+        let json_str = str::from_utf8(&buff).unwrap();
+        let data: DiscordJoinAccept = serde_json::from_str(&json_str).unwrap();
         let config = match utils::get_config() {
             Ok(value) => value,
             Err(value) => {
@@ -107,7 +107,7 @@ impl EventHandlers for DiscordEventHandler {
             user_id: 0,
             username: String::new(),
             launch_mode: "play".to_string(),
-            game_info: log_fail!(rblx.generate_ticket().ok_or("Could not generate auth ticket")),
+            game_info: rblx.generate_ticket().ok_or("Could not generate auth ticket").unwrap(),
             request: "RequestGameJob".to_string(),
             launch_time:  0,
             access_code: String::default(),
@@ -124,9 +124,9 @@ impl EventHandlers for DiscordEventHandler {
         };
         // TODO: come up with a better way to pass data
         let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);
-        let (rblx_rp_reg, _) = log_fail!(hkcr.create_subkey(r"Software\rblx_rich_presence"));
-        log_fail!(rblx_rp_reg.set_value("join_data", &join_data.as_url()));
-        log_fail!(rblx_rp_reg.set_value("join_key", &secret.to_string()));
-        log_fail!(rblx_rp_reg.set_value("proceed", &"true"));
+        let (rblx_rp_reg, _) = hkcr.create_subkey(r"Software\rblx_rich_presence").unwrap();
+        rblx_rp_reg.set_value("join_data", &join_data.as_url()).unwrap();
+        rblx_rp_reg.set_value("join_key", &secret.to_string()).unwrap();
+        rblx_rp_reg.set_value("proceed", &"true").unwrap();
     }
 }
