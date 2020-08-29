@@ -2,20 +2,13 @@ use crate::models::Config;
 use crate::roblox::Roblox;
 use crate::tray_menu;
 use base64::encode;
-use rustcord::RichPresenceBuilder;
-use rustcord::Rustcord;
-use std::borrow::Cow;
-use std::fs::File;
-use std::io::{stdin, stdout, Read, Write};
-use std::sync::mpsc;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::path::{Path, PathBuf};
-use std::time;
-use std::env;
-use std::time::SystemTime;
+use rustcord::{Rustcord, RichPresenceBuilder};
 use winreg::{enums, RegKey};
 use sysinfo::{System, SystemExt};
+use std::{
+    fs::File, io::{stdin, stdout, Read, Write}, sync::{mpsc, Arc, Mutex},
+    thread, path::{Path, PathBuf}, time, env, time::SystemTime
+};
 
 pub fn pause() {
     let mut stdout = stdout();
@@ -26,26 +19,35 @@ pub fn pause() {
 
 fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, now: SystemTime) {
     let mut rblx = rblx.lock().unwrap();
+    let updated = rblx.update_game_info();
+    
     let large_image_text = if config.presence.show_username {
-        Cow::Owned(format!("Playing ROBLOX as {}", rblx.join_data.username))
+        format!("Playing ROBLOX as {}", rblx.join_data.username)
     } else {
-        Cow::Borrowed("Playing ROBLOX")
+        "Playing ROBLOX".to_string()
     };
 
-    //FIXME: Get rid of inline if statements for deciding place_name and make it into a single variable.
-    // Tried doing that but compiler was complaining about being unsafe and couldn't find a way to fix it.
+    let place_name: &str = if config.presence.show_game {
+        if rblx.join_data.place_name == "Unknown Game" {
+            ""
+        } else {
+            rblx.join_data.place_name.as_str()
+        }
+    } else {
+        ""
+    };
+
     if config.presence.show_presence {
         // check the game the user is in
-        let updated = rblx.update_game_info();
-        if updated.is_none() {
+        if !updated {
             println!("WARN: Couldn't find the game you're in, so Discord join invites are disabled until it's found");
             let presence = RichPresenceBuilder::new()
                 .state("In a game")
-                .details(if config.presence.show_game {&rblx.join_data.place_name} else {""})
+                .details(place_name)
                 .large_image_key("logo")
                 .large_image_text(&large_image_text)
                 .small_image_key("play_status")
-                .small_image_text(if config.presence.show_game {&rblx.join_data.place_name} else {""})
+                .small_image_text(place_name)
                 .start_time(now)
                 .build();
             discord.update_presence(presence).unwrap();
@@ -55,11 +57,11 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
         if rblx.server_hidden {
             let presence = RichPresenceBuilder::new()
                 .state("In a game")
-                .details(if config.presence.show_game {&rblx.join_data.place_name} else {""})
+                .details(place_name)
                 .large_image_key("logo")
                 .large_image_text(&large_image_text)
                 .small_image_key("play_status")
-                .small_image_text(if config.presence.show_game {&rblx.join_data.place_name} else {""})
+                .small_image_text(place_name)
                 .start_time(now)
                 .build();
             discord.update_presence(presence).unwrap();
@@ -73,11 +75,11 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
             println!("WARN: Couldn't find the server you're in, so Discord join invites are disabled until it's found");
             let presence = RichPresenceBuilder::new()
                 .state("In a game")
-                .details(if config.presence.show_game {&rblx.join_data.place_name} else {""})
+                .details(place_name)
                 .large_image_key("logo")
                 .large_image_text(&large_image_text)
                 .small_image_key("play_status")
-                .small_image_text(if config.presence.show_game {&rblx.join_data.place_name} else {""})
+                .small_image_text(place_name)
                 .start_time(now)
                 .build();
             discord.update_presence(presence).unwrap();
@@ -89,11 +91,11 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
             );
             let presence = RichPresenceBuilder::new()
                 .state("In a game")
-                .details(if config.presence.show_game {&rblx.join_data.place_name} else {""})
+                .details(place_name)
                 .large_image_key("logo")
                 .large_image_text(&large_image_text)
                 .small_image_key("play_status")
-                .small_image_text(if config.presence.show_game {&rblx.join_data.place_name} else {""})
+                .small_image_text(place_name)
                 .party_id(&rblx.join_data.job_id)
                 .start_time(now)
                 .party_size(server_info.playing.unwrap_or(1))

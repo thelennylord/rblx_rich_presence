@@ -889,6 +889,7 @@ name = "rblx_rich_presence"
 version = "0.1.8"
 dependencies = [
  "base64",
+ "regex",
  "reqwest",
  "rustcord",
  "serde",

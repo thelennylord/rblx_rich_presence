@@ -5,18 +5,17 @@ mod roblox;
 mod tray_menu;
 
 use models::*;
+use regex::Regex;
 use rustcord::{RichPresenceBuilder, Rustcord};
-use std::env;
-use std::thread;
-use std::panic;
-use std::path::{Path, PathBuf};
-use std::time::SystemTime;
-use std::io::{stdout, Write};
 use sysinfo::{ProcessExt, Signal, SystemExt};
 use winreg::{enums, RegKey};
 use serde_json::Value;
 use winapi::um::{winuser::SetWindowTextW, wincon::GetConsoleWindow};
 use tray_menu::wide_str;
+use std::{
+    env, thread, panic, process::exit, time::SystemTime,
+    path::{Path, PathBuf}, io::{stdout, Write}
+};
 
 // Checks if the current version of rblx_rich_presence is latest
 fn is_latest_version() -> bool {
@@ -38,7 +37,7 @@ fn is_latest_version() -> bool {
             }
         }
     } else {
-        println!("WARN: Could not fetch version; Received status code {:#?}", res.status());
+        println!("[WARN] Could not fetch version; Received status code {:#?}", res.status());
     }
     false
 }
@@ -49,10 +48,10 @@ fn main() {
         let handle = thread::current();
         println!("\n\n\
         Well, this is awkward...\n\
-        Roblox Rich Presence encountered an issue and crashed.\n\
+        Roblox Rich Presence encountered an issue and had to shut down.\n\
         To help us diagnose and fix this issue, \
-        you may report it along with the below crash message at https://github.com/thelennylord/rblx_rich_presence/issues\n\n\
-        Crash message:\n\
+        you may report it along with the below error message at https://github.com/thelennylord/rblx_rich_presence/issues\n\n\
+        Error message:\n\
         thread '{}' {}", handle.name().unwrap_or("unknown"), panic_info);
         utils::pause();
     }));
@@ -97,14 +96,22 @@ fn main() {
     let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);
     let rblx_reg = hkcr.open_subkey_with_flags(r"Software\Classes\roblox-player\shell\open\command", enums::KEY_ALL_ACCESS).unwrap();
     let value: String = rblx_reg.get_value("").unwrap();
-    
     let exe_dir: PathBuf = env::current_exe().unwrap();
     let exe_name: &str = exe_dir.file_name().unwrap().to_str().unwrap();
-    if !value.ends_with(&format!("{}\" \"%1\"", exe_name)) {
-        config.general.roblox = value[1..&value.len()-4].to_string();
+
+    let re = Regex::new("(\"[^\"]+\"|[^\\s\"]+)").unwrap();
+    let group = re.captures(&value).unwrap();
+    let mut launcher_path: &str = group.get(0).unwrap().as_str();
+    if launcher_path.chars().next().unwrap() == '"' {
+        launcher_path = &launcher_path[1..launcher_path.len()-1];
+    }
+
+    if !launcher_path.ends_with(exe_name) {
+        config.general.roblox = String::from(launcher_path);
         utils::set_config(&config).unwrap();
     }
-    rblx_reg.set_value("", &format!("\"{}\" \"%1\"", std::env::current_exe().unwrap().to_str().unwrap())).unwrap();
+
+    rblx_reg.set_value("", &format!("\"{}\" \"%1\"", env::current_exe().unwrap().to_str().unwrap())).unwrap();
     
     // Setup registry values for passing information
     // TODO: Find a more efficient way of doing it
@@ -127,18 +134,26 @@ fn main() {
                 .with_path(config.general.roblox)
                 .with_url(value);
             rblx.generate_and_save_roblosecurity();
-            rblx.join_data.game_info = rblx.generate_ticket().ok_or("Could not generate auth ticket").unwrap();
+            rblx.join_data.game_info = rblx.generate_ticket().or_else(|| {
+                println!("[ERROR] Could not generate authentication ticket; Provided .ROBLOSECURITY cookie might be invalid.");
+                utils::pause();
+                exit(0);
+            }).unwrap();
 
             if !rblx.verify_roblosecurity() {
-                println!("ERROR: Invalid .ROBLOSECURITY cookie in config.toml");
+                println!("[ERROR] Invalid .ROBLOSECURITY cookie in config.toml");
                 utils::pause();
-                std::process::exit(0);
+                exit(0);
             }
             
             let rblx = rblx.with_additional_info_from_request_type();
             
             println!("Launching Roblox...");
-            rblx.launch().unwrap();
+            if let Err(error) = rblx.launch() {
+                println!("[ERROR] Could not launch Roblox; {}", error);
+                utils::pause();
+                exit(1);
+            };
             println!("Launched Roblox\nLoading rich presence...");
             
             let join_data = rblx.get_join_data();
@@ -169,7 +184,7 @@ fn main() {
             }
             if close {
                 println!("No pending task detected, closing...");
-                std::process::exit(0);
+                exit(0);
             }
             println!("Connecting to Roblox...");
             let join_url: String = rblx_rp_reg.get_value("join_data").unwrap();
@@ -185,10 +200,18 @@ fn main() {
                 .with_url(join_url)
                 .with_additional_info_from_request_type();
             rblx.generate_and_save_roblosecurity();
-            rblx.join_data.game_info = rblx.generate_ticket().ok_or("Could not generate auth ticket").unwrap();
+            rblx.join_data.game_info = rblx.generate_ticket().or_else(|| {
+                println!("[ERROR] Could not generate authentication ticket; Provided .ROBLOSECURITY cookie might be invalid.");
+                utils::pause();
+                exit(0);
+            }).unwrap();
 
             println!("Launching Roblox...");
-            rblx.launch().unwrap();
+            if let Err(error) = rblx.launch() {
+                println!("[ERROR] Could not launch Roblox; {}", error);
+                utils::pause();
+                exit(0);
+            };
             println!("Launched Roblox\nLoading rich presence...");
 
             let join_data = rblx.get_join_data();

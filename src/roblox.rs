@@ -1,16 +1,10 @@
-use crate::utils::pause;
-use crate::utils::{get_config, set_config};
-use reqwest::header;
+use crate::utils::{pause, get_config, set_config};
+use reqwest::{header, blocking::{Client, ClientBuilder}};
 use serde::Deserialize;
 use serde_json::Value;
-use std::collections::HashMap;
-use std::process::Command;
-use std::path::Path;
-use std::thread;
-use std::time;
 use url::Url;
 use winreg::{enums, RegKey};
-use reqwest::blocking::{Client, ClientBuilder};
+use std::{collections::HashMap, process::{Command, exit}, path::Path, thread, time};
 
 pub struct Roblox {
     pub join_data: RobloxJoinData,
@@ -33,45 +27,45 @@ impl Roblox {
 
     /// Launches Roblox with the saved game data
     pub fn launch(&self) -> Result<(), std::io::Error> {
+        // Check if Roblox path is valid
+        let roblox_path = Path::new(&self.path);
+        if !roblox_path.exists() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Interrupted,
+                format!("The path '{}' does not exist", &self.path),
+            ));
+        }
+
         let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);
         let rblx_reg = hkcr.open_subkey_with_flags(
             r"Software\Classes\roblox-player\shell\open\command",
             enums::KEY_SET_VALUE,
         )?;
-        // prevents roblox from installing again, which we don't want
+        // Prevents Roblox from installing again, which we don't want
         rblx_reg.set_value("", &format!("\"{}\" %1", &self.path))?;
 
-        // spawn Roblox Launcher
+
+        // Spawn Roblox Launcher
         let mut rblx_launcher = Command::new(&self.path);
         &rblx_launcher.arg(&self.join_data.as_url());
         if !rblx_launcher.status()?.success() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Interrupted,
-                format!("{} was interrupted", Path::new(&self.path).file_name().unwrap().to_str().unwrap()),
+                format!("{} was interrupted", roblox_path.file_name().unwrap().to_str().unwrap()),
             ));
         }
-        loop {
-            let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);
-            let rblx_reg = hkcr.open_subkey_with_flags(
-                r"Software\Classes\roblox-player\shell\open\command",
-                enums::KEY_SET_VALUE,
-            )?;
-            match rblx_reg.set_value(
-                "",
-                &format!(
-                    "\"{}\" \"%1\"",
-                    std::env::current_exe().unwrap().to_str().unwrap()
-                ),
-            ) {
-                Ok(value) => value,
-                Err(_) => {
-                    println!("Error occurred while setting a few things up; trying again...");
-                    thread::sleep(time::Duration::from_secs(1));
-                    continue;
-                }
-            }
-            break;
-        }
+        let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);
+        let rblx_reg = hkcr.open_subkey_with_flags(
+            r"Software\Classes\roblox-player\shell\open\command",
+            enums::KEY_SET_VALUE,
+        )?;
+       rblx_reg.set_value(
+            "",
+            &format!(
+                "\"{}\" \"%1\"",
+                std::env::current_exe().unwrap().to_str().unwrap()
+            ),
+        )?;
         Ok(())
     }
 
@@ -129,7 +123,7 @@ impl Roblox {
     }
 
     /// Uses Roblox Authentication Ticket to get .ROLOSECURITY
-    pub fn generate_and_save_roblosecurity(&self) {
+    pub fn generate_and_save_roblosecurity(&mut self) {
         let client = Client::new();
         let mut body = HashMap::new();
         body.insert("authenticationTicket", &self.join_data.game_info);
@@ -148,6 +142,7 @@ impl Roblox {
             let roblosecurity: &str = &raw_roblosecurity[15..raw_roblosecurity.find(';').unwrap()];
             let mut config = get_config().unwrap();
             
+            self.roblosecurity = roblosecurity.to_string();
             config.general.roblosecurity = roblosecurity.to_string();
             set_config(&config).unwrap();
         }
@@ -203,9 +198,6 @@ impl Roblox {
                         continue;
                     }
                     _ => {
-                        //println!("{}", ticket_res.status().as_u16());
-                        //println!("{:#?}", ticket_res.headers());
-                        //crate::utils::pause();
                         return None;
                     }
                 }
@@ -332,7 +324,7 @@ impl Roblox {
                             None => {
                                 println!("Error while getting job id: {:#?}", data);
                                 pause();
-                                std::process::exit(1);
+                                exit(1);
                             }
                         };
                         if job_id.starts_with("Join") {
@@ -352,7 +344,7 @@ impl Roblox {
                         self.join_data.username = match &json_data["UserName"] {
                             Value::String(value) => value.to_string(),
                             _ => {
-                                println!("WARN: Could not get username");
+                                println!("[WARN] Could not get username");
                                 "Player".to_string()
                             },
                         };
@@ -360,7 +352,7 @@ impl Roblox {
                         self.join_data.user_id = match &json_data["UserId"] {
                             Value::Number(value) =>  value.as_u64().unwrap(),
                             _ => {
-                                println!("WARN: Could not get user ID of currently logged in user");
+                                println!("[WARN] Could not get user ID of currently logged in user");
                                 0
                             }
                         };
@@ -371,14 +363,14 @@ impl Roblox {
                     } else if res.status().is_server_error() {
                         println!("Server error occurred: {:#?}", res.status());
                         pause();
-                        std::process::exit(1);
+                        exit(1);
                     } else {
                         println!(
-                            "Something happened while communitcating with the server: {:#?}",
+                            "[ERROR] Something happened while communitcating with Roblox: Received status code {:#?}",
                             res.status()
                         );
                         pause();
-                        std::process::exit(1);
+                        exit(0);
                     }
                 }
             }
@@ -419,7 +411,7 @@ impl Roblox {
                                 }
                             }
                             pause();
-                            std::process::exit(0);
+                            exit(0);
                         }
                     };
                     let join_url =
@@ -434,7 +426,7 @@ impl Roblox {
                     self.join_data.username = match &json_data["UserName"] {
                         Value::String(value) => value.to_string(),
                         _ => {
-                            println!("WARN: Could not get username of currently logged in user");
+                            println!("[WARN] Could not get username of currently logged in user");
                             "Player".to_string()
                         },
                     };
@@ -442,7 +434,7 @@ impl Roblox {
                     self.join_data.user_id = match &json_data["UserId"] {
                         Value::Number(value) =>  value.as_u64().unwrap(),
                         _ => {
-                            println!("WARN: Could not get user ID of currently logged in user");
+                            println!("[WARN] Could not get user ID of currently logged in user");
                             0
                         }
                     };
@@ -524,12 +516,12 @@ impl Roblox {
         None
     }
 
-    pub fn update_game_info(&mut self) -> Option<&mut Self> {
+    pub fn update_game_info(&mut self) -> bool {
         // During the first call, roblox returns status 10 (user not in game) as our info on the api hasn't been updated yet.
         // So, skip the first call
         if self.skip_update {
             self.skip_update = false;
-            return Some(self);
+            return true;
         }
 
         let client = Client::new();
@@ -575,7 +567,7 @@ impl Roblox {
                         
                         self.join_data.job_id = String::default();
                         self.server_hidden = true;
-                        return Some(self);
+                        return true;
                     },
                     12 => {
                         // User is not authorized to join their own game.
@@ -606,7 +598,7 @@ impl Roblox {
                         }
                         
                         self.server_hidden = true;
-                        return Some(self);
+                        return true;
                     },
                     _ => {
                         if self.join_data.job_id != job_id {
@@ -620,7 +612,7 @@ impl Roblox {
                         let place_id: u64 = match &json_data["PlaceId"] {
                             Value::Number(value) => value.as_u64().unwrap(),
                             _ => {
-                                return None; 
+                                return false; 
                             }
                         };
                         
@@ -642,14 +634,14 @@ impl Roblox {
                         }
                         
                         self.server_hidden = false;
-                        return Some(self);
+                        return true;
                     }
                 };
             }
-            return None;
+            return false;
         }
 
-        None
+        false
     }
 }
 

@@ -2,8 +2,7 @@ use crate::{roblox, utils};
 use base64::decode;
 use rustcord::{EventHandlers, User};
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
-use std::str;
+use std::{fmt::Debug, str, process::exit};
 use winreg::{enums, RegKey};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -72,25 +71,15 @@ impl EventHandlers for DiscordEventHandler {
     }
     fn join_game(secret: &str) {
         // TODO: Handle join game from Discord
-        let buff = match decode(&secret) {
-            Ok(a) => a,
-            Err(err) => {
-                println!("Error: {:#?}", err);
-                utils::pause();
-                std::process::exit(1);
-            }
-        };
+        let buff = decode(&secret).unwrap();
         let json_str = str::from_utf8(&buff).unwrap();
         let data: DiscordJoinAccept = serde_json::from_str(&json_str).unwrap();
         let config = match utils::get_config() {
             Ok(value) => value,
             Err(value) => {
-                println!(
-                    "Error occurred while reading config.toml\n\nError: {:#?}",
-                    value
-                );
+                println!("[ERROR] Failed to read config.toml; {}", value);
                 utils::pause();
-                std::process::exit(1);
+                exit(1);
             }
         };
         let rblx = roblox::Roblox::new()
@@ -98,16 +87,22 @@ impl EventHandlers for DiscordEventHandler {
             .with_path(config.general.roblox);
 
         if !rblx.verify_roblosecurity() {
-            println!("ERROR: Invalid .ROBLOSECURITY cookie in config.toml");
+            println!("[ERROR] Invalid .ROBLOSECURITY cookie in config.toml");
             utils::pause();
-            std::process::exit(0);
+            exit(0);
         }
         
+        let auth_ticket = rblx.generate_ticket().or_else(|| {
+            println!("[ERROR] Could not generate authentication ticket; Provided .ROBLOSECURITY cookie might be invalid.");
+            utils::pause();
+            exit(0);
+        }).unwrap();
+
         let join_data = roblox::RobloxJoinData {
             user_id: 0,
             username: String::new(),
             launch_mode: "play".to_string(),
-            game_info: rblx.generate_ticket().ok_or("Could not generate auth ticket").unwrap(),
+            game_info: auth_ticket,
             request: "RequestGameJob".to_string(),
             launch_time:  0,
             access_code: String::default(),
