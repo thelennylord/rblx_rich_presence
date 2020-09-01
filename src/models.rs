@@ -54,6 +54,109 @@ impl PresenceConfig {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PartialConfig {
+    pub general: Option<PartialGeneralConfig>,
+    pub presence: Option<PartialPresenceConfig>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PartialGeneralConfig {
+    pub roblox: Option<String>,
+    pub roblosecurity: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PartialPresenceConfig {
+    pub show_username: Option<bool>,
+    pub show_game: Option<bool>,
+    pub show_presence: Option<bool>,
+    pub update_interval: Option<u64>,
+}
+
+impl PartialConfig {
+    /// Transforms a PartialConfig into a Config
+    /// Consumes self to return Config
+    pub fn to_complete(self) -> Config {
+        let mut config: Config = Config::default();
+
+        // General Config
+        if self.general.is_some() {
+            let general = self.general.unwrap();
+            if general.roblox.is_some() {
+                config.general.roblox = general.roblox.unwrap();
+            }
+
+            if general.roblosecurity.is_some() {
+                config.general.roblosecurity = general.roblosecurity.unwrap();
+            }
+        }
+        
+        // Presence Config
+        if self.presence.is_some() {
+            let presence = self.presence.unwrap();
+            if presence.show_username.is_some() {
+                config.presence.show_username = presence.show_username.unwrap();
+            }
+
+            if presence.show_game.is_some() {
+                config.presence.show_game = presence.show_game.unwrap();
+            }
+
+            if presence.show_presence.is_some() {
+                config.presence.show_presence = presence.show_presence.unwrap();
+            }
+
+            if presence.update_interval.is_some() {
+                config.presence.update_interval = presence.update_interval.unwrap();
+            }
+        }
+
+        config
+    }
+
+    /// Returns boolean whether all the properties of a PartialConfig is Some
+    pub fn has_all_some(&self) -> bool {
+        // General Config
+        if self.general.is_some() {
+            let general = self.general.as_ref().unwrap();
+            if general.roblox.is_none() {
+                return false;
+            }
+
+            if general.roblosecurity.is_none() {
+                return false;
+            }
+        } else {
+            return false;
+        }
+        
+        // Presence Config
+        if self.presence.is_some() {
+            let presence = self.presence.as_ref().unwrap();
+            if presence.show_username.is_none() {
+                return false;
+            }
+
+            if presence.show_game.is_none() {
+                return false;
+            }
+
+            if presence.show_presence.is_none() {
+                return false;
+            }
+
+            if presence.update_interval.is_none() {
+                return false;
+            }
+        } else {
+            return false;
+        }
+
+        true
+    }
+}
+
 #[derive(Deserialize, Debug)]
 pub struct DiscordJoinAccept {
     pub place_id: u64,

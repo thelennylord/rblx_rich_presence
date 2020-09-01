@@ -1,4 +1,4 @@
-use crate::models::Config;
+use crate::models::{PartialConfig, Config};
 use crate::roblox::Roblox;
 use crate::tray_menu;
 use base64::encode;
@@ -243,11 +243,17 @@ pub fn get_config() -> Result<Config, std::io::Error> {
     };
 
     let mut file = File::open(config_path).unwrap();
-
     let mut buffer: String = String::new();
 
     file.read_to_string(&mut buffer).unwrap();
-    let config: Config = toml::from_str(&buffer)?;
+
+    // Autofill the config with missing fields along with their default values
+    let partial_config: PartialConfig = toml::from_str(&buffer)?;
+    let has_all_some: bool = partial_config.has_all_some();
+    let config: Config = partial_config.to_complete();
+    if !has_all_some {
+        set_config(&config)?;
+    }
 
     Ok(config)
 }
