@@ -886,7 +886,7 @@ dependencies = [
 
 [[package]]
 name = "rblx_rich_presence"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "base64",
  "regex",

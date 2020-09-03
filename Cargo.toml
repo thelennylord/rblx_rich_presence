@@ -1,7 +1,7 @@
 [package]
 name = "rblx_rich_presence"
 description = "Roblox with Rich Presence"
-version = "0.1.8"
+version = "0.1.9"
 authors = ["thelennylord <32369619+thelennylord@users.noreply.github.com>"]
 edition = "2018"
 readme = "README.md"
