@@ -5,7 +5,6 @@ mod roblox;
 mod tray_menu;
 
 use models::*;
-use regex::Regex;
 use rustcord::{RichPresenceBuilder, Rustcord};
 use sysinfo::{ProcessExt, Signal, SystemExt};
 use winreg::{enums, RegKey};
@@ -13,9 +12,11 @@ use serde_json::Value;
 use winapi::um::{winuser::SetWindowTextW, wincon::GetConsoleWindow};
 use tray_menu::wide_str;
 use std::{
-    env, thread, panic, process::exit, time::SystemTime,
-    path::{Path, PathBuf}, io::{stdout, Write}
+    env, thread, panic, process::{exit, Command}, time::SystemTime,
+    path::Path, io::{stdout, Write}
 };
+use json;
+
 
 // Checks if the current version of rblx_rich_presence is latest
 fn is_latest_version() -> bool {
@@ -92,27 +93,56 @@ fn main() {
         }
     }
     
-    // Extract Roblox path and save it to config, and replace URL Protocol command with rblx_rich_presence.exe
+    // Replace URL Protocol command with rblx_rich_presence.exe
     let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);
     let rblx_reg = hkcr.open_subkey_with_flags(r"Software\Classes\roblox-player\shell\open\command", enums::KEY_ALL_ACCESS).unwrap();
-    let value: String = rblx_reg.get_value("").unwrap();
-    let exe_dir: PathBuf = env::current_exe().unwrap();
-    let exe_name: &str = exe_dir.file_name().unwrap().to_str().unwrap();
-
-    let re = Regex::new("(\"[^\"]+\"|[^\\s\"]+)").unwrap();
-    let group = re.captures(&value).unwrap();
-    let mut launcher_path: &str = group.get(0).unwrap().as_str();
-    if launcher_path.chars().next().unwrap() == '"' {
-        launcher_path = &launcher_path[1..launcher_path.len()-1];
-    }
-
-    if !launcher_path.ends_with(exe_name) {
-        config.general.roblox = String::from(launcher_path);
-        utils::set_config(&config).unwrap();
-    }
-
     rblx_reg.set_value("", &format!("\"{}\" \"%1\"", env::current_exe().unwrap().to_str().unwrap())).unwrap();
     
+    // Get latest Roblox WindowsPlayer version and find Roblox path
+    let client = reqwest::blocking::Client::new();
+    let res = client
+        .get("https://clientsettings.roblox.com/v2/client-version/WindowsPlayer")
+        .header(reqwest::header::ACCEPT, "application/json")
+        .send()
+        .unwrap();
+    
+    let mut roblox_ver = String::from("version-5a2a97e1d9794df1");
+    if res.status().is_success() {
+        let data = res.text().unwrap();
+        let parsed = json::parse(&data).unwrap();
+        roblox_ver = parsed["clientVersionUpload"].to_string();
+    }
+
+    let cmd = Command::new("cmd")
+        .args(&["/C", "echo %localappdata%"])
+        .output()
+        .unwrap();
+
+    let out = String::from_utf8_lossy(&cmd.stdout);
+    let roblox_dir = Path::new(&out.trim_end()).join("Roblox");
+    if !roblox_dir.exists() {
+        println!("[ERROR] Could not find Roblox installation directory. Have you installed Roblox yet?");
+        utils::pause();
+        exit(0);
+    }
+
+    let roblox_player = roblox_dir.join(format!("Versions/{}/RobloxPlayerLauncher.exe", roblox_ver));
+    if roblox_player.exists() {
+        config.general.roblox = roblox_player.to_string_lossy().into_owned();
+    } else {
+        for entry in roblox_dir.join("Versions").read_dir().unwrap() {
+            if let Ok(entry) = entry {
+                let roblox_player = entry.path().join("RobloxPlayerLauncher.exe");
+                if roblox_player.exists() {
+                    config.general.roblox = roblox_player.to_string_lossy().into_owned();
+                    break;
+                }
+            }
+        }
+    }
+
+    utils::set_config(&config).unwrap();
+
     // Setup registry values for passing information
     // TODO: Find a more efficient way of doing it
     let (rblx_rp_reg, _) = hkcr.create_subkey(r"Software\rblx_rich_presence").unwrap();
