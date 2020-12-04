@@ -1,8 +1,8 @@
-use crate::{roblox, utils};
+use crate::roblox;
 use base64::decode;
 use rustcord::{EventHandlers, User};
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, str, process::exit};
+use std::{fmt::Debug, str};
 use winreg::{enums, RegKey};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -188,49 +188,14 @@ impl EventHandlers for DiscordEventHandler {
         let buff = decode(&secret).unwrap();
         let json_str = str::from_utf8(&buff).unwrap();
         let data: DiscordJoinAccept = serde_json::from_str(&json_str).unwrap();
-        let config = match utils::get_config() {
-            Ok(value) => value,
-            Err(value) => {
-                println!("[ERROR] Failed to read config.toml; {}", value);
-                utils::pause();
-                exit(1);
-            }
-        };
-        let rblx = roblox::Roblox::new()
-            .with_roblosecurity(config.general.roblosecurity)
-            .with_path(config.general.launcher);
 
-        if !rblx.verify_roblosecurity() {
-            println!("[ERROR] Invalid .ROBLOSECURITY cookie in config.toml");
-            utils::pause();
-            exit(0);
-        }
+        let mut join_data = roblox::RobloxJoinData::default();
+        join_data.request = "RequestGameJob".to_string();
+        join_data.place_launcher_url = format!("https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestGameJob&browserTrackerId=0&placeId={}&gameId={}&isPlayTogetherGame=false", &data.place_id, &data.job_id);
+        join_data.place_id = data.place_id;
+        join_data.job_id = data.job_id;
         
-        let auth_ticket = rblx.generate_ticket().or_else(|| {
-            println!("[ERROR] Could not generate authentication ticket; Provided .ROBLOSECURITY cookie might be invalid.");
-            utils::pause();
-            exit(0);
-        }).unwrap();
 
-        let join_data = roblox::RobloxJoinData {
-            user_id: 0,
-            username: String::new(),
-            launch_mode: "play".to_string(),
-            game_info: auth_ticket,
-            request: "RequestGameJob".to_string(),
-            launch_time:  0,
-            access_code: String::default(),
-            link_code: String::default(),
-            place_launcher_url: format!("https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestGameJob&browserTrackerId=0&placeId={}&gameId={}&isPlayTogetherGame=false", &data.place_id, &data.job_id),
-            is_play_together: "false".to_string(),
-            place_id: data.place_id,
-            place_name: String::new(),
-            job_id: data.job_id.to_string(),
-            friend_user_id: 0,
-            browser_tracker_id: 0,
-            roblox_locale: "en_us".to_string(),
-            game_locale: "en_us".to_string()
-        };
         // TODO: come up with a better way to pass data
         let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);
         let (rblx_rp_reg, _) = hkcr.create_subkey(r"Software\rblx_rich_presence").unwrap();

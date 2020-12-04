@@ -6,7 +6,6 @@ mod tray_menu;
 
 use models::*;
 use rustcord::{RichPresenceBuilder, Rustcord};
-use sysinfo::{ProcessExt, Signal, SystemExt};
 use winreg::{enums, RegKey};
 use serde_json::Value;
 use winapi::um::{winuser::SetWindowTextW, wincon::GetConsoleWindow};
@@ -74,24 +73,24 @@ fn main() {
     println!("Loaded config.toml");
     
     // Close all instances of Roblox if open
-    let system = sysinfo::System::new_all();
-    for process in system.get_process_by_name("RobloxPlayerBeta.exe") {
-        println!("Found another instance of Roblox opened, killing it...");
-        process.kill(Signal::Kill);
-    }
+    // let system = sysinfo::System::new_all();
+    // for process in system.get_process_by_name("RobloxPlayerBeta.exe") {
+    //     println!("Found another instance of Roblox opened, killing it...");
+    //     process.kill(Signal::Kill);
+    // }
     
-    if config.general.launcher.is_empty() {
-        for process in system.get_process_by_name("RobloxPlayerLauncher.exe") {
-            println!("Found another instance of Roblox opened, killing it...");
-            process.kill(Signal::Kill);
-        }
-    } else {
-        let file_name: &str = Path::new(&config.general.launcher).file_name().unwrap().to_str().unwrap();
-        for process in system.get_process_by_name(file_name) {
-            println!("Found another instance of Roblox opened, killing it...");
-            process.kill(Signal::Kill);
-        }
-    }
+    // if config.general.launcher.is_empty() {
+    //     for process in system.get_process_by_name("RobloxPlayerLauncher.exe") {
+    //         println!("Found another instance of Roblox opened, killing it...");
+    //         process.kill(Signal::Kill);
+    //     }
+    // } else {
+    //     let file_name: &str = Path::new(&config.general.launcher).file_name().unwrap().to_str().unwrap();
+    //     for process in system.get_process_by_name(file_name) {
+    //         println!("Found another instance of Roblox opened, killing it...");
+    //         process.kill(Signal::Kill);
+    //     }
+    // }
     
     // Replace URL Protocol command with rblx_rich_presence.exe
     let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);
@@ -148,124 +147,90 @@ fn main() {
     }
 
     // Setup registry values for passing information
-    // TODO: Find a more efficient way of doing it
     let (rblx_rp_reg, _) = hkcr.create_subkey(r"Software\rblx_rich_presence").unwrap();
-    rblx_rp_reg.set_value("join_data", &"").unwrap();
-    rblx_rp_reg.set_value("join_key", &"").unwrap();
-    rblx_rp_reg.set_value("proceed", &"false").unwrap();
-    
     let discord = Rustcord::init::<DiscordEventHandler>(
         "725360592570941490",
         true,
         None
     ).unwrap();
     
+    let mut join_url = String::default();
+    let mut from_discord = false;
     match env::args().nth(1) {
         Some(value) => {
-            println!("Connecting to Roblox...");
-            let mut rblx = roblox::Roblox::new()
-                .with_roblosecurity(config.general.roblosecurity)
-                .with_path(config.general.launcher)
-                .with_url(value);
-            rblx.generate_and_save_roblosecurity();
-            rblx.join_data.game_info = rblx.generate_ticket().or_else(|| {
-                println!("[ERROR] Could not generate authentication ticket; Provided .ROBLOSECURITY cookie might be invalid.");
-                utils::pause();
-                exit(0);
-            }).unwrap();
-
-            if !rblx.verify_roblosecurity() {
-                println!("[ERROR] Invalid .ROBLOSECURITY cookie in config.toml");
-                utils::pause();
-                exit(0);
-            }
-            
-            let rblx = rblx.with_additional_info_from_request_type();
-            
-            println!("Launching Roblox...");
-            if let Err(error) = rblx.launch() {
-                println!("[ERROR] Could not launch Roblox; {}", error);
-                utils::pause();
-                exit(1);
-            };
-            println!("Launched Roblox\nLoading rich presence...");
-            
-            let join_data = rblx.get_join_data();
-            let now = SystemTime::now();
-            let presence = RichPresenceBuilder::new()
-                .state("In a game")
-                .details(&join_data.place_name)
-                .large_image_key("logo")
-                .large_image_text("Playing ROBLOX")
-                .small_image_key("play_status")
-                .small_image_text(&join_data.place_name)
-                .start_time(now)
-                .build();
-            discord.update_presence(presence).unwrap();
-            utils::watch(discord, rblx, now);
+            join_url = value;
         }
+
         None => {            
             let mut close = true;
             for _ in 0..20 {
-                std::thread::sleep(std::time::Duration::from_millis(500));
+                discord.run_callbacks();
+                
                 let proceed: String = rblx_rp_reg.get_value("proceed").unwrap();
                 if proceed == "true" {
                     rblx_rp_reg.set_value("proceed", &"false").unwrap();
+                    join_url = rblx_rp_reg.get_value("join_data").unwrap();
                     close = false;
+                    from_discord = true;
                     break;
                 }
-                discord.run_callbacks();
+                std::thread::sleep(std::time::Duration::from_millis(500));
             }
             if close {
                 println!("No pending task detected, closing...");
+                utils::pause();
                 exit(0);
             }
-            println!("Connecting to Roblox...");
-            let join_url: String = rblx_rp_reg.get_value("join_data").unwrap();
-            let discord = Rustcord::init::<DiscordEventHandler>(
-                "725360592570941490",
-                true,
-                None
-            ).unwrap();
-
-            let mut rblx = roblox::Roblox::new()
-                .with_roblosecurity(config.general.roblosecurity)
-                .with_path(config.general.launcher)
-                .with_url(join_url)
-                .with_additional_info_from_request_type();
-            rblx.generate_and_save_roblosecurity();
-            rblx.join_data.game_info = rblx.generate_ticket().or_else(|| {
-                println!("[ERROR] Could not generate authentication ticket; Provided .ROBLOSECURITY cookie might be invalid.");
-                utils::pause();
-                exit(0);
-            }).unwrap();
-
-            println!("Launching Roblox...");
-            if let Err(error) = rblx.launch() {
-                println!("[ERROR] Could not launch Roblox; {}", error);
-                utils::pause();
-                exit(0);
-            };
-            println!("Launched Roblox\nLoading rich presence...");
-
-            let join_data = rblx.get_join_data();
-            let now = SystemTime::now();
-            let presence = RichPresenceBuilder::new()
-                .state("In a game")
-                .details(&join_data.place_name)
-                .large_image_key("logo")
-                .large_image_text("Playing ROBLOX")
-                .small_image_key("play_status")
-                .small_image_text(&join_data.place_name)
-                .start_time(now)
-                .build();
-            rblx_rp_reg.set_value("join_data", &"").unwrap();
-            rblx_rp_reg.set_value("join_key", &"").unwrap();
-
-            discord.update_presence(presence).unwrap();
-            utils::watch(discord, rblx, now);
         }
     }
 
-    println!("Closing program...");
+    println!("Connecting to Roblox...");
+    let mut rblx = roblox::Roblox::new()
+        .with_roblosecurity(config.general.roblosecurity)
+        .with_path(config.general.launcher)
+        .with_url(join_url);
+        
+    if !from_discord {
+        rblx.generate_and_save_roblosecurity();
+    }
+
+    if !rblx.verify_roblosecurity() {
+        println!("[ERROR] Invalid .ROBLOSECURITY cookie in config.toml detected. Join a game to update the saved .ROBLOSECURITY cookie.");	
+        utils::pause();	
+        exit(0);
+    }
+    
+    rblx.join_data.game_info = rblx.generate_ticket().or_else(|| {
+        println!("[ERROR] Could not generate authentication ticket. Are Roblox servers down? Please try joining the game again.");
+        utils::pause();
+        exit(0);
+    }).unwrap();
+    
+    rblx.get_additional_info_from_request_type();
+
+
+    println!("Launching Roblox...");
+    if let Err(error) = rblx.launch() {
+        println!("[ERROR] Could not launch Roblox; {}", error);
+        utils::pause();
+        exit(0);
+    };
+    println!("Launched Roblox\nLoading rich presence...");
+
+    let join_data = rblx.get_join_data();
+    let now = SystemTime::now();
+    let presence = RichPresenceBuilder::new()
+        .state("In a game")
+        .details(&join_data.place_name)
+        .large_image_key("logo")
+        .large_image_text("Playing ROBLOX")
+        .small_image_key("play_status")
+        .small_image_text(&join_data.place_name)
+        .start_time(now)
+        .build();
+
+    discord.update_presence(presence).unwrap();
+    utils::watch(discord, rblx, now);
+
+    println!("Closing rich presence...");
 }

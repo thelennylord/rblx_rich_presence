@@ -4,7 +4,10 @@ use serde::Deserialize;
 use serde_json::Value;
 use url::Url;
 use winreg::{enums, RegKey};
-use std::{collections::HashMap, process::{Command, exit}, path::Path, thread, time};
+use std::{
+    collections::HashMap, process::{Command, exit}, path::Path, thread, time, 
+    time::{SystemTime, UNIX_EPOCH}
+};
 
 pub struct Roblox {
     pub join_data: RobloxJoinData,
@@ -47,7 +50,8 @@ impl Roblox {
 
         // Spawn Roblox Launcher
         let mut rblx_launcher = Command::new(&self.path);
-        &rblx_launcher.arg(&self.join_data.as_url());
+        rblx_launcher.arg(self.join_data.as_url());
+        println!("{}", self.join_data.as_url());
         if !rblx_launcher.status()?.success() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Interrupted,
@@ -261,7 +265,7 @@ impl Roblox {
             launch_mode: options.get("launchmode").unwrap().to_string(),
             game_info: options.get("gameinfo").unwrap().to_string(),
             request: query.get("request").unwrap().to_string(),
-            launch_time: options.get("launchtime").unwrap().parse::<u64>().unwrap(),
+            launch_time: options.get("launchtime").unwrap().parse::<u128>().unwrap(),
             access_code: query
                 .get("accessCode")
                 .unwrap_or(&"".to_string())
@@ -294,7 +298,7 @@ impl Roblox {
         }
     }
 
-    pub fn with_additional_info_from_request_type(mut self) -> Self {
+    pub fn get_additional_info_from_request_type(&mut self) {
         match &self.join_data.request.as_str() {
             &"RequestGame" | &"RequestGameJob" | &"RequestPrivateGame" => {
                 let client = Client::new();
@@ -462,7 +466,7 @@ impl Roblox {
             }
         }
 
-        self
+        println!("{:#?}", self.join_data);
     }
 
     pub fn get_server_info(&self) -> Option<RobloxServerData> {
@@ -497,7 +501,8 @@ impl Roblox {
             let url = format!("https://games.roblox.com/v1/games/{}/servers/Public?sortOrder=Asc&limit=100&cursor={}", &self.join_data.place_id, next_cursor_page);
             let resp = client.get(&url).send().unwrap();
             if resp.status().is_server_error() {
-                panic!("Server error detected!");
+                println!("[WARN] Received 4XX error code while requesting for player count, skipping...");
+                return None;
             }
 
             let datap = serde_json::from_str::<RobloxServerListData>(&resp.text().unwrap()).unwrap();
@@ -680,7 +685,7 @@ pub struct RobloxJoinData {
     pub launch_mode: String,
     pub game_info: String,
     pub request: String,
-    pub launch_time: u64,
+    pub launch_time: u128,
     pub access_code: String,
     pub link_code: String,
     pub place_launcher_url: String,
@@ -696,13 +701,15 @@ pub struct RobloxJoinData {
 
 impl RobloxJoinData {
     pub fn default() -> Self {
+        let start = SystemTime::now();
+        let since_epoch = start.duration_since(UNIX_EPOCH).unwrap();
         Self {
             user_id: 0,
             username: "Player".to_string(),
             launch_mode: "play".to_string(),
             game_info: "abcd".to_string(),
             request: "https://www.roblox.com/".to_string(),
-            launch_time: 0,
+            launch_time: since_epoch.as_millis(),
             link_code: String::default(),
             access_code: String::default(),
             place_launcher_url: "https://www.roblox.com".to_string(),
@@ -711,9 +718,24 @@ impl RobloxJoinData {
             place_name: "A Roblox Game".to_string(),
             job_id: "abcdefghijklmnopqurstuvwxyz".to_string(),
             friend_user_id: 0,
-            browser_tracker_id: 0,
+            browser_tracker_id: 1397865,
             roblox_locale: "en_us".to_string(),
             game_locale: "en_us".to_string(),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn generate_launch_url(&mut self) {
+        if self.request == "RequestPrivateGame" {
+            self.place_launcher_url = format!(
+                "https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestPrivateGame&browserTrackerId={}&placeId={}&accessCode={}&linkCode={}",
+                self.browser_tracker_id, self.place_id, self.access_code, self.link_code
+            );
+        } else {
+            self.place_launcher_url = format!(
+                "https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestGameJob&browserTrackerId={}&placeId={}&gameId={}&isPlayTogetherGame={}",
+                self.browser_tracker_id, self.place_id, self.job_id, self.is_play_together
+            );
         }
     }
 
@@ -722,17 +744,17 @@ impl RobloxJoinData {
         if self.request == "RequestPrivateGame" {
             place_launcher_url = format!(
                 "https%3A%2F%2Fassetgame.roblox.com%2Fgame%2FPlaceLauncher.ashx%3Frequest%3DRequestPrivateGame%26browserTrackerId%3D{}%26placeId%3D{}%26accessCode%3D{}%26linkCode%3D{}",
-                &self.browser_tracker_id, &self.place_id, &self.access_code, &self.link_code
+                self.browser_tracker_id, self.place_id, self.access_code, self.link_code
             );
         } else {
             place_launcher_url = format!(
                 "https%3A%2F%2Fassetgame.roblox.com%2Fgame%2FPlaceLauncher.ashx%3Frequest%3DRequestGameJob%26browserTrackerId%3D{}%26placeId%3D{}%26gameId%3D{}%26isPlayTogetherGame%3D{}",
-                &self.browser_tracker_id, &self.place_id, &self.job_id, &self.is_play_together
+                self.browser_tracker_id, self.place_id, self.job_id, self.is_play_together
             );
         }
         format!(
             "roblox-player:1+launchmode:{}+gameinfo:{}+launchtime:{}+placelauncherurl:{}+browsertrackerid:{}+robloxLocale:{}+gameLocale:{}",
-            &self.launch_mode, &self.game_info, &self.launch_time, &place_launcher_url, &self.browser_tracker_id, &self.roblox_locale, &self.game_locale
+            self.launch_mode, self.game_info, self.launch_time, place_launcher_url, self.browser_tracker_id, self.roblox_locale, self.game_locale
         )
     }
 }
