@@ -80,13 +80,13 @@ fn main() {
         process.kill(Signal::Kill);
     }
     
-    if config.general.roblox.is_empty() {
+    if config.general.launcher.is_empty() {
         for process in system.get_process_by_name("RobloxPlayerLauncher.exe") {
             println!("Found another instance of Roblox opened, killing it...");
             process.kill(Signal::Kill);
         }
     } else {
-        let file_name: &str = Path::new(&config.general.roblox).file_name().unwrap().to_str().unwrap();
+        let file_name: &str = Path::new(&config.general.launcher).file_name().unwrap().to_str().unwrap();
         for process in system.get_process_by_name(file_name) {
             println!("Found another instance of Roblox opened, killing it...");
             process.kill(Signal::Kill);
@@ -99,49 +99,53 @@ fn main() {
     rblx_reg.set_value("", &format!("\"{}\" \"%1\"", env::current_exe().unwrap().to_str().unwrap())).unwrap();
     
     // Get latest Roblox WindowsPlayer version and find Roblox path
-    let client = reqwest::blocking::Client::new();
-    let res = client
-        .get("https://clientsettings.roblox.com/v2/client-version/WindowsPlayer")
-        .header(reqwest::header::ACCEPT, "application/json")
-        .send()
-        .unwrap();
+    if !config.general.is_custom_launcher {
+        let client = reqwest::blocking::Client::new();
+        let res = client
+            .get("https://clientsettings.roblox.com/v2/client-version/WindowsPlayer")
+            .header(reqwest::header::ACCEPT, "application/json")
+            .send()
+            .unwrap();
+        
+        let mut roblox_ver = String::from("version-5a2a97e1d9794df1");
+        if res.status().is_success() {
+            let data = res.text().unwrap();
+            let parsed = json::parse(&data).unwrap();
+            roblox_ver = parsed["clientVersionUpload"].to_string();
+        }
     
-    let mut roblox_ver = String::from("version-5a2a97e1d9794df1");
-    if res.status().is_success() {
-        let data = res.text().unwrap();
-        let parsed = json::parse(&data).unwrap();
-        roblox_ver = parsed["clientVersionUpload"].to_string();
-    }
-
-    let cmd = Command::new("cmd")
-        .args(&["/C", "echo %localappdata%"])
-        .output()
-        .unwrap();
-
-    let out = String::from_utf8_lossy(&cmd.stdout);
-    let roblox_dir = Path::new(&out.trim_end()).join("Roblox");
-    if !roblox_dir.exists() {
-        println!("[ERROR] Could not find Roblox installation directory. Have you installed Roblox yet?");
-        utils::pause();
-        exit(0);
-    }
-
-    let roblox_player = roblox_dir.join(format!("Versions/{}/RobloxPlayerLauncher.exe", roblox_ver));
-    if roblox_player.exists() {
-        config.general.roblox = roblox_player.to_string_lossy().into_owned();
-    } else {
-        for entry in roblox_dir.join("Versions").read_dir().unwrap() {
-            if let Ok(entry) = entry {
-                let roblox_player = entry.path().join("RobloxPlayerLauncher.exe");
-                if roblox_player.exists() {
-                    config.general.roblox = roblox_player.to_string_lossy().into_owned();
-                    break;
+        let cmd = Command::new("cmd")
+            .args(&["/C", "echo %localappdata%"])
+            .output()
+            .unwrap();
+    
+        let out = String::from_utf8_lossy(&cmd.stdout);
+        let roblox_dir = Path::new(&out.trim_end()).join("Roblox");
+        if !roblox_dir.exists() {
+            println!("[ERROR] Could not find Roblox installation directory. Have you installed Roblox yet?");
+            utils::pause();
+            exit(0);
+        }
+    
+        let roblox_player = roblox_dir.join(format!("Versions/{}/RobloxPlayerLauncher.exe", roblox_ver));
+        if roblox_player.exists() {
+            config.general.launcher = roblox_player.to_string_lossy().into_owned();
+        } else {
+            for entry in roblox_dir.join("Versions").read_dir().unwrap() {
+                if let Ok(entry) = entry {
+                    let roblox_player = entry.path().join("RobloxPlayerLauncher.exe");
+                    if roblox_player.exists() {
+                        config.general.launcher = roblox_player.to_string_lossy().into_owned();
+                        break;
+                    }
                 }
             }
         }
+    
+        utils::set_config(&config).unwrap();
+    } else {
+        println!("Skipping Roblox launcher check since custom launcher has been provided")
     }
-
-    utils::set_config(&config).unwrap();
 
     // Setup registry values for passing information
     // TODO: Find a more efficient way of doing it
@@ -161,7 +165,7 @@ fn main() {
             println!("Connecting to Roblox...");
             let mut rblx = roblox::Roblox::new()
                 .with_roblosecurity(config.general.roblosecurity)
-                .with_path(config.general.roblox)
+                .with_path(config.general.launcher)
                 .with_url(value);
             rblx.generate_and_save_roblosecurity();
             rblx.join_data.game_info = rblx.generate_ticket().or_else(|| {
@@ -226,7 +230,7 @@ fn main() {
 
             let mut rblx = roblox::Roblox::new()
                 .with_roblosecurity(config.general.roblosecurity)
-                .with_path(config.general.roblox)
+                .with_path(config.general.launcher)
                 .with_url(join_url)
                 .with_additional_info_from_request_type();
             rblx.generate_and_save_roblosecurity();

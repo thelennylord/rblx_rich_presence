@@ -180,7 +180,7 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
                 loop {
                     system.refresh_all();
                     
-                    let launcher_name: &str = Path::new(&config.general.roblox).file_name().unwrap().to_str().unwrap();
+                    let launcher_name: &str = Path::new(&config.general.launcher).file_name().unwrap().to_str().unwrap();
                     if system.get_process_by_name(launcher_name).is_empty() {
                         // Roblox is not updating, break out of the loop
                         break;
@@ -209,7 +209,7 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
                     let exe_dir: PathBuf = env::current_exe().unwrap();
                     let exe_name: &str = exe_dir.file_name().unwrap().to_str().unwrap();
                     if !value.ends_with(&format!("{}\" \"%1\"", exe_name)) {
-                        config.general.roblox = value[1..&value.len()-4].to_string();
+                        config.general.launcher = value[1..&value.len()-4].to_string();
                         set_config(&config).unwrap();
                     }
 

@@ -22,14 +22,16 @@ impl Config {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GeneralConfig {
-    pub roblox: String,
+    pub launcher: String,
+    pub is_custom_launcher: bool,
     pub roblosecurity: String,
 }
 
 impl GeneralConfig {
     pub fn default() -> Self {
         GeneralConfig {
-            roblox: String::default(),
+            launcher: String::default(),
+            is_custom_launcher: false,
             roblosecurity: String::default()
         }
     }
@@ -62,7 +64,8 @@ pub struct PartialConfig {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PartialGeneralConfig {
-    pub roblox: Option<String>,
+    pub launcher: Option<String>,
+    pub is_custom_launcher: Option<bool>,
     pub roblosecurity: Option<String>,
 }
 
@@ -83,8 +86,12 @@ impl PartialConfig {
         // General Config
         if self.general.is_some() {
             let general = self.general.unwrap();
-            if general.roblox.is_some() {
-                config.general.roblox = general.roblox.unwrap();
+            if general.launcher.is_some() {
+                config.general.launcher = general.launcher.unwrap();
+            }
+
+            if general.is_custom_launcher.is_some() {
+                config.general.is_custom_launcher = general.is_custom_launcher.unwrap();
             }
 
             if general.roblosecurity.is_some() {
@@ -120,7 +127,11 @@ impl PartialConfig {
         // General Config
         if self.general.is_some() {
             let general = self.general.as_ref().unwrap();
-            if general.roblox.is_none() {
+            if general.launcher.is_none() {
+                return false;
+            }
+
+            if general.is_custom_launcher.is_none() {
                 return false;
             }
 
@@ -187,7 +198,7 @@ impl EventHandlers for DiscordEventHandler {
         };
         let rblx = roblox::Roblox::new()
             .with_roblosecurity(config.general.roblosecurity)
-            .with_path(config.general.roblox);
+            .with_path(config.general.launcher);
 
         if !rblx.verify_roblosecurity() {
             println!("[ERROR] Invalid .ROBLOSECURITY cookie in config.toml");
