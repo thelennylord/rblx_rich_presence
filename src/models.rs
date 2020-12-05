@@ -1,4 +1,3 @@
-use crate::roblox;
 use base64::decode;
 use rustcord::{EventHandlers, User};
 use serde::{Deserialize, Serialize};
@@ -190,17 +189,11 @@ impl EventHandlers for DiscordEventHandler {
         let json_str = str::from_utf8(&buff).unwrap();
         let data: DiscordJoinAccept = serde_json::from_str(&json_str).unwrap();
 
-        let mut join_data = roblox::RobloxJoinData::default();
-        join_data.request = "RequestGameJob".to_string();
-        join_data.place_launcher_url = format!("https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestGameJob&browserTrackerId=0&placeId={}&gameId={}&isPlayTogetherGame=false", &data.place_id, &data.job_id);
-        join_data.place_id = data.place_id;
-        join_data.job_id = data.job_id;
-        
-
         // TODO: come up with a better way to pass data
         let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);
         let (rblx_rp_reg, _) = hkcr.create_subkey(r"Software\rblx_rich_presence").unwrap();
-        rblx_rp_reg.set_value("join_data", &join_data.as_url()).unwrap();
+        rblx_rp_reg.set_value("place_id", &data.place_id).unwrap();
+        rblx_rp_reg.set_value("job_id", &data.job_id).unwrap();
         rblx_rp_reg.set_value("join_key", &secret.to_string()).unwrap();
         rblx_rp_reg.set_value("proceed", &"true").unwrap();
     }

@@ -93,9 +93,8 @@ impl Roblox {
         self
     }
 
-    pub fn with_url(mut self, url: String) -> Self {
+    pub fn with_url(&mut self, url: String) {
         self.join_data = self.parse_url(url);
-        self
     }
 
     /// Sets a custom Roblox launch path
@@ -719,7 +718,6 @@ impl RobloxJoinData {
         }
     }
 
-    #[allow(dead_code)]
     pub fn generate_launch_url(&mut self) {
         if self.request == "RequestPrivateGame" {
             self.place_launcher_url = format!(

@@ -134,6 +134,11 @@ fn main() {
 
     // Setup registry values for passing information
     let (rblx_rp_reg, _) = hkcr.create_subkey(r"Software\rblx_rich_presence").unwrap();
+    rblx_rp_reg.set_value("place_id", &0u64).unwrap();
+    rblx_rp_reg.set_value("job_id", &"").unwrap();
+    rblx_rp_reg.set_value("join_key", &"").unwrap();
+    rblx_rp_reg.set_value("proceed", &"false").unwrap();
+    
     let discord = Rustcord::init::<DiscordEventHandler>(
         "725360592570941490",
         true,
@@ -173,10 +178,18 @@ fn main() {
     log!("Connecting to Roblox...");
     let mut rblx = roblox::Roblox::new()
         .with_roblosecurity(config.general.roblosecurity)
-        .with_path(config.general.launcher)
-        .with_url(join_url);
+        .with_path(config.general.launcher);
         
-    if !from_discord {
+    if from_discord {
+        let mut join_data = roblox::RobloxJoinData::default();
+        join_data.request = "RequestGameJob".to_string();
+        join_data.place_id = rblx_rp_reg.get_value("place_id").unwrap();
+        join_data.job_id = rblx_rp_reg.get_value("job_id").unwrap();
+        join_data.generate_launch_url();
+        rblx.join_data = join_data;
+
+    } else {
+        rblx.with_url(join_url);
         rblx.generate_and_save_roblosecurity();
     }
 
