@@ -4,6 +4,7 @@ use rustcord::{EventHandlers, User};
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, str};
 use winreg::{enums, RegKey};
+use std::io::{stdout, Write};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
@@ -178,7 +179,7 @@ pub struct DiscordEventHandler;
 
 impl EventHandlers for DiscordEventHandler {
     fn ready(user: User) {
-        println!(
+        log!(
             "Connected to Discord as {}#{}",
             user.username, user.discriminator
         );

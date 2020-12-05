@@ -1,4 +1,5 @@
 #[macro_use]
+mod logs;
 mod utils;
 mod models;
 mod roblox;
@@ -8,7 +9,14 @@ use models::*;
 use rustcord::{RichPresenceBuilder, Rustcord};
 use winreg::{enums, RegKey};
 use serde_json::Value;
-use winapi::um::{winuser::SetWindowTextW, wincon::GetConsoleWindow};
+use winapi::um::{
+    winuser::SetWindowTextW, 
+    wincon::{
+        GetConsoleWindow, SetConsoleTextAttribute, FOREGROUND_RED, FOREGROUND_GREEN, FOREGROUND_BLUE, FOREGROUND_INTENSITY
+    }, 
+    processenv::GetStdHandle, 
+    winbase::STD_OUTPUT_HANDLE
+};
 use tray_menu::wide_str;
 use std::{
     env, thread, panic, process::{exit, Command}, time::SystemTime,
@@ -37,7 +45,7 @@ fn is_latest_version() -> bool {
             }
         }
     } else {
-        println!("[WARN] Could not fetch version; Received status code {:#?}", res.status());
+        warn!("Could not fetch version; Received status code {:#?}", res.status());
     }
     false
 }
@@ -68,29 +76,9 @@ fn main() {
     }
 
     
-    println!("Loading config.toml...");
+    log!("Loading config.toml...");
     let mut config = utils::get_config().unwrap();
-    println!("Loaded config.toml");
-    
-    // Close all instances of Roblox if open
-    // let system = sysinfo::System::new_all();
-    // for process in system.get_process_by_name("RobloxPlayerBeta.exe") {
-    //     println!("Found another instance of Roblox opened, killing it...");
-    //     process.kill(Signal::Kill);
-    // }
-    
-    // if config.general.launcher.is_empty() {
-    //     for process in system.get_process_by_name("RobloxPlayerLauncher.exe") {
-    //         println!("Found another instance of Roblox opened, killing it...");
-    //         process.kill(Signal::Kill);
-    //     }
-    // } else {
-    //     let file_name: &str = Path::new(&config.general.launcher).file_name().unwrap().to_str().unwrap();
-    //     for process in system.get_process_by_name(file_name) {
-    //         println!("Found another instance of Roblox opened, killing it...");
-    //         process.kill(Signal::Kill);
-    //     }
-    // }
+    log!("Loaded config.toml");
     
     // Replace URL Protocol command with rblx_rich_presence.exe
     let hkcr = RegKey::predef(enums::HKEY_CURRENT_USER);
@@ -121,9 +109,7 @@ fn main() {
         let out = String::from_utf8_lossy(&cmd.stdout);
         let roblox_dir = Path::new(&out.trim_end()).join("Roblox");
         if !roblox_dir.exists() {
-            println!("[ERROR] Could not find Roblox installation directory. Have you installed Roblox yet?");
-            utils::pause();
-            exit(0);
+            error!("Could not find Roblox installation directory. Have you installed Roblox yet?");
         }
     
         let roblox_player = roblox_dir.join(format!("Versions/{}/RobloxPlayerLauncher.exe", roblox_ver));
@@ -143,7 +129,7 @@ fn main() {
     
         utils::set_config(&config).unwrap();
     } else {
-        println!("Skipping Roblox launcher check since custom launcher has been provided")
+        log!("Skipping Roblox launcher check since custom launcher has been provided")
     }
 
     // Setup registry values for passing information
@@ -177,14 +163,14 @@ fn main() {
                 std::thread::sleep(std::time::Duration::from_millis(500));
             }
             if close {
-                println!("No pending task detected, closing...");
+                log!("No pending task detected, closing...");
                 utils::pause();
                 exit(0);
             }
         }
     }
 
-    println!("Connecting to Roblox...");
+    log!("Connecting to Roblox...");
     let mut rblx = roblox::Roblox::new()
         .with_roblosecurity(config.general.roblosecurity)
         .with_path(config.general.launcher)
@@ -195,27 +181,22 @@ fn main() {
     }
 
     if !rblx.verify_roblosecurity() {
-        println!("[ERROR] Invalid .ROBLOSECURITY cookie in config.toml detected. Join a game to update the saved .ROBLOSECURITY cookie.");	
-        utils::pause();	
-        exit(0);
+        error!("Invalid .ROBLOSECURITY cookie in config.toml detected. Join a game to update the saved .ROBLOSECURITY cookie.");	
     }
     
     rblx.join_data.game_info = rblx.generate_ticket().or_else(|| {
-        println!("[ERROR] Could not generate authentication ticket. Are Roblox servers down? Please try joining the game again.");
-        utils::pause();
-        exit(0);
+        error!("Could not generate authentication ticket. Are Roblox servers down? Please try joining the game again.");
     }).unwrap();
     
     rblx.get_additional_info_from_request_type();
 
 
-    println!("Launching Roblox...");
+    log!("Launching Roblox...");
     if let Err(error) = rblx.launch() {
-        println!("[ERROR] Could not launch Roblox; {}", error);
-        utils::pause();
-        exit(0);
+        error!("Could not launch Roblox; {}", error);
     };
-    println!("Launched Roblox\nLoading rich presence...");
+    log!("Launched Roblox");
+    log!("Loading rich presence...");
 
     let join_data = rblx.get_join_data();
     let now = SystemTime::now();
@@ -232,5 +213,5 @@ fn main() {
     discord.update_presence(presence).unwrap();
     utils::watch(discord, rblx, now);
 
-    println!("Closing rich presence...");
+    log!("Closing rich presence...");
 }

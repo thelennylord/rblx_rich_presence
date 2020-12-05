@@ -1,4 +1,4 @@
-use crate::utils::{pause, get_config, set_config};
+use crate::utils::{get_config, set_config};
 use reqwest::{header, blocking::{Client, ClientBuilder}};
 use serde::Deserialize;
 use serde_json::Value;
@@ -6,7 +6,13 @@ use url::Url;
 use winreg::{enums, RegKey};
 use std::{
     collections::HashMap, process::{Command, exit}, path::Path, thread, time, 
-    time::{SystemTime, UNIX_EPOCH}
+    time::{SystemTime, UNIX_EPOCH}, io::{stdout, Write}
+};
+use winapi::um::{
+    wincon::{
+        SetConsoleTextAttribute, FOREGROUND_RED, FOREGROUND_GREEN, FOREGROUND_BLUE, FOREGROUND_INTENSITY
+    },
+    processenv::GetStdHandle, winbase::STD_OUTPUT_HANDLE 
 };
 
 pub struct Roblox {
@@ -51,7 +57,6 @@ impl Roblox {
         // Spawn Roblox Launcher
         let mut rblx_launcher = Command::new(&self.path);
         rblx_launcher.arg(self.join_data.as_url());
-        println!("{}", self.join_data.as_url());
         if !rblx_launcher.status()?.success() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Interrupted,
@@ -317,7 +322,7 @@ impl Roblox {
                     {
                         Ok(value) => value,
                         Err(_) => {
-                            println!("Could not connect to Roblox, trying again...");
+                            warn!("Could not connect to Roblox, trying again...");
                             continue;
                         }
                     };
@@ -326,13 +331,11 @@ impl Roblox {
                         let job_id = match &data.job_id {
                             Some(value) => value,
                             None => {
-                                println!("Error while getting job id: {:#?}", data);
-                                pause();
-                                exit(1);
+                                error!("Could not get job ID: {:#?}", data);
                             }
                         };
                         if job_id.starts_with("Join") {
-                            println!("Waiting for server...");
+                            log!("Waiting for server...");
                             let duration = time::Duration::from_secs(3);
                             thread::sleep(duration);
                             continue;
@@ -348,7 +351,7 @@ impl Roblox {
                         self.join_data.username = match &json_data["UserName"] {
                             Value::String(value) => value.to_string(),
                             _ => {
-                                println!("[WARN] Could not get username");
+                                warn!("Could not get username");
                                 "Player".to_string()
                             },
                         };
@@ -356,25 +359,21 @@ impl Roblox {
                         self.join_data.user_id = match &json_data["UserId"] {
                             Value::Number(value) =>  value.as_u64().unwrap(),
                             _ => {
-                                println!("[WARN] Could not get user ID of currently logged in user");
+                                warn!("Could not get user ID of currently logged in user");
                                 0
                             }
                         };
 
-                        println!("Found an available server");
+                        log!("Found an available server");
                         self.join_data.job_id = job_id.to_string();
                         break;
                     } else if res.status().is_server_error() {
-                        println!("Server error occurred: {:#?}", res.status());
-                        pause();
-                        exit(1);
+                        error!("Server error occurred: {:#?}", res.status());
                     } else {
-                        println!(
-                            "[ERROR] Something happened while communitcating with Roblox: Received status code {:#?}",
+                        error!(
+                            "Something happened while communitcating with Roblox: Received status code {:#?}",
                             res.status()
                         );
-                        pause();
-                        exit(0);
                     }
                 }
             }
@@ -400,22 +399,20 @@ impl Roblox {
                         None => {
                             match &data.status {
                                 10 => {
-                                    println!("Error while joining game: User is no longer in game",);
+                                    error!("Could not join the server. User is no longer in game");
                                 },
                                 12 => {
-                                    println!("Error while joining the game: You aren't authorized to join this game")
+                                    error!("Could not join the server. You aren't authorized to join this game")
                                 }
                                 _ => {
-                                    println!(
-                                        "Error while joining game: {}",
+                                    error!(
+                                        "Could not join the game. {}",
                                         data.message
                                             .unwrap_or("Unknown error occurred".to_string())
                                             .to_string()
                                     );
                                 }
                             }
-                            pause();
-                            exit(0);
                         }
                     };
                     let join_url =
@@ -430,7 +427,7 @@ impl Roblox {
                     self.join_data.username = match &json_data["UserName"] {
                         Value::String(value) => value.to_string(),
                         _ => {
-                            println!("[WARN] Could not get username of currently logged in user");
+                            warn!("Could not get username of currently logged in user");
                             "Player".to_string()
                         },
                     };
@@ -438,7 +435,7 @@ impl Roblox {
                     self.join_data.user_id = match &json_data["UserId"] {
                         Value::Number(value) =>  value.as_u64().unwrap(),
                         _ => {
-                            println!("[WARN] Could not get user ID of currently logged in user");
+                            warn!("Could not get user ID of currently logged in user");
                             0
                         }
                     };
@@ -465,8 +462,6 @@ impl Roblox {
                 _ => "Unknown Game".to_string(),
             }
         }
-
-        println!("{:#?}", self.join_data);
     }
 
     pub fn get_server_info(&self) -> Option<RobloxServerData> {
@@ -501,7 +496,7 @@ impl Roblox {
             let url = format!("https://games.roblox.com/v1/games/{}/servers/Public?sortOrder=Asc&limit=100&cursor={}", &self.join_data.place_id, next_cursor_page);
             let resp = client.get(&url).send().unwrap();
             if resp.status().is_server_error() {
-                println!("[WARN] Received 4XX error code while requesting for player count, skipping...");
+                warn!("Received 4XX error code while requesting for player count, skipping...");
                 return None;
             }
 

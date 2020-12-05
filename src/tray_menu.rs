@@ -180,7 +180,7 @@ pub unsafe fn start(tx: Sender<Sender<bool>>) {
     };
 
     if winuser::RegisterClassExW(&wcex) == 0 {
-        return println!("Error creating class");
+        panic!("Error creating class");
     };
 
     let hwnd = winuser::CreateWindowExW(
@@ -199,7 +199,7 @@ pub unsafe fn start(tx: Sender<Sender<bool>>) {
     );
 
     if hwnd == null_mut() {
-        return println!("hwnd is a null pointer");
+        panic!("hwnd is a null pointer");
     }
     
     let mut nid = NOTIFYICONDATAW {
@@ -236,7 +236,7 @@ pub unsafe fn start(tx: Sender<Sender<bool>>) {
     }
 
     if Shell_NotifyIconW(NIM_ADD, &mut nid as *mut NOTIFYICONDATAW) == 0 {
-        return println!("Error while creating icon in tray");
+        panic!("Error while creating icon in tray");
     }
 
     let mut msg = winuser::MSG {

@@ -9,10 +9,16 @@ use std::{
     fs::File, io::{stdin, stdout, Read, Write}, sync::{mpsc, Arc, Mutex},
     thread, path::{Path, PathBuf}, time, env, time::SystemTime
 };
+use winapi::um::{
+    wincon::{
+        SetConsoleTextAttribute, FOREGROUND_RED, FOREGROUND_GREEN, FOREGROUND_BLUE,
+    },
+    processenv::GetStdHandle, winbase::STD_OUTPUT_HANDLE 
+};
 
 pub fn pause() {
     let mut stdout = stdout();
-    stdout.write_all(b"Press any key to continue...").unwrap();
+    stdout.write_all(b"\nPress any key to continue...").unwrap();
     stdout.flush().unwrap();
     stdin().read_exact(&mut [0]).unwrap();
 }
@@ -40,7 +46,7 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
     if config.presence.show_presence {
         // check the game the user is in
         if !updated {
-            println!("WARN: Couldn't find the game you're in, so Discord join invites are disabled until it's found");
+            warn!("Couldn't find the game you're in, so Discord join invites are disabled until it's found");
             let presence = RichPresenceBuilder::new()
                 .state("In a game")
                 .details(place_name)
@@ -72,7 +78,7 @@ fn update_presence(config: &Config, discord: &Rustcord, rblx: &Mutex<Roblox>, no
         let server_info = rblx.get_server_info();
 
         if server_info.is_none() {
-            println!("WARN: Couldn't find the server you're in, so Discord join invites are disabled until it's found");
+            warn!("Couldn't find the server you're in, so Discord join invites are disabled until it's found");
             let presence = RichPresenceBuilder::new()
                 .state("In a game")
                 .details(place_name)
@@ -154,7 +160,7 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
                 let config = get_config().unwrap();
                 update_presence(&config, &thread2_disc, &thread2_rblx, now);
                 *prev_time = since_epoch;
-                println!("config.toml updated; updating rich presence");
+                log!("config.toml updated; updating rich presence");
             }
         }
         thread::sleep(time::Duration::from_secs(1));
@@ -189,14 +195,15 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
                     if !update_msg_shown {
                         // We want the message to be displayed only once
                         update_msg_shown = true;
-                        println!("Found Roblox launcher open; Roblox could be updating...\nWaiting for Roblox to finish updating...");
+                        log!("Found Roblox launcher open; Roblox could be updating..."); 
+                        log!("Waiting for Roblox to finish updating...");
                     }
                     updated = true;
                     thread::sleep(duration);
                 }
 
                 if updated {
-                    println!("Roblox has finished updating");
+                    log!("Roblox has finished updating");
                     
                     
                     // Registry values have been reset, so revert them back
@@ -217,9 +224,9 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
                 }
 
                 tries += 1;
-                println!("Could not find Roblox, trying again...");
+                warn!("Could not find Roblox, trying again...");
             } else {
-                println!("Could not find Roblox, shutting down...");
+                warn!("Could not find Roblox, shutting down...");
                 break;
             }
             continue;
@@ -231,14 +238,14 @@ pub fn watch(disc: rustcord::Rustcord, rblx: Roblox, now: SystemTime) {
 
     tray_tx.send(true).unwrap();
     rx.recv().unwrap();
-    println!("Roblox has shut down");
+    log!("Roblox has shut down");
 }
 
 pub fn get_config() -> Result<Config, std::io::Error> {
     let dir = env::current_exe()?;
     let config_path = dir.parent().unwrap().join("config.toml");
     if !config_path.exists() {
-        println!("WARN: Could not find config.toml; creating...");
+        warn!("Could not find config.toml; creating...");
         set_config(&Config::default()).unwrap();
     };
 
