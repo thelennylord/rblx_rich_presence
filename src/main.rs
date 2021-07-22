@@ -94,12 +94,13 @@ fn main() {
             .send()
             .unwrap();
         
-        let mut roblox_ver = String::from("version-5a2a97e1d9794df1");
-        if res.status().is_success() {
+        let roblox_ver = if res.status().is_success() {
             let data = res.text().unwrap();
             let parsed = json::parse(&data).unwrap();
-            roblox_ver = parsed["clientVersionUpload"].to_string();
-        }
+            parsed["clientVersionUpload"].to_string()
+        } else {
+            "version-0".to_string()
+        };
     
         let cmd = Command::new("cmd")
             .args(&["/C", "echo %localappdata%"])

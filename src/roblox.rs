@@ -145,9 +145,14 @@ impl Roblox {
             .unwrap();
         
         if res.status().is_success() {
-            let set_cookie_headers = res.headers().get(header::SET_COOKIE);
-            let raw_roblosecurity: &str = set_cookie_headers.iter().next().unwrap().to_str().unwrap();
-            let roblosecurity: &str = &raw_roblosecurity[15..raw_roblosecurity.find(';').unwrap()];
+            let set_cookie_headers = res.headers().get_all(header::SET_COOKIE);
+            let roblosecurity_header = set_cookie_headers.iter().find(|&header| header.to_str().unwrap().starts_with(".ROBLOSECURITY"));
+            if roblosecurity_header.is_none() {
+                error!("Roblox API did not return the .ROBLOSECURITY cookie; try joining the game again. If the issue persist, please open an issue at https://github.com/thelennylord/rblx_rich_presence/issues");
+            }
+
+            let raw_cookie = roblosecurity_header.unwrap().to_str().unwrap();
+            let roblosecurity: &str = &raw_cookie[15..raw_cookie.find(';').unwrap()];
             let mut config = get_config().unwrap();
             
             self.roblosecurity = roblosecurity.to_string();
