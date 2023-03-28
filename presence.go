@@ -20,12 +20,6 @@ func StartDiscordRpc() error {
 		return err
 	}
 
-	// Should probably wait for a few seconds as the presence returns Website as we are fetching it too quickly
-	lastPresence, err := GetUserPresence()
-	if err != nil {
-		return err
-	}
-
 	config, err := GetConfig()
 	if err != nil {
 		return err
@@ -38,55 +32,18 @@ func StartDiscordRpc() error {
 		largeText = "Playing Roblox"
 	}
 
-	now := time.Now()
-	err = client.SetActivity(client.Activity{
-		State:   "In an experience",
-		Details: "Playing " + lastPresence.LastLocation,
-
-		LargeImage: "logo",
-		LargeText:  largeText,
-
-		SmallImage: "play_status",
-		SmallText:  lastPresence.LastLocation,
-
-		Buttons: []*client.Button{
-			{
-				Label: "View on Roblox",
-				Url:   "https://www.roblox.com/games/" + strconv.Itoa(*lastPresence.RootPlaceId),
-			},
-		},
-
-		Timestamps: &client.Timestamps{
-			Start: &now,
-		},
-	})
-
-	if err != nil {
-		return err
-	}
-
 	// Update loop
-	// Is there a better way to implement this?
-	for {
-		// Discord Rich Presence has a ratelimit of 1 update per 15 seconds
-		time.Sleep(15 * time.Second)
+	var lastPresence *UserPresence
 
+	for {
 		presence, err := GetUserPresence()
-		if err != nil {
+		if err != nil || presence.LastLocation == "Website" {
+			time.Sleep(3 * time.Second)
 			continue
 		}
 
-		if presence.LastLocation == "Website" {
-			client.Logout()
-			return nil
-		}
-
-		if lastPresence == nil || lastPresence.LastLocation == "Website" {
-			lastPresence = presence
-		}
-
 		// User has joined a different game/server through in-game teleportation
-		if presence.GameId != lastPresence.GameId {
+		if lastPresence == nil || *presence.GameId != *lastPresence.GameId {
 			startTime := time.Now()
 
 			client.SetActivity(client.Activity{
@@ -102,7 +59,7 @@ func StartDiscordRpc() error {
 				Buttons: []*client.Button{
 					{
 						Label: "View on Roblox",
-						Url:   "https://www.roblox.com/games/" + strconv.Itoa(*lastPresence.RootPlaceId),
+						Url:   "https://www.roblox.com/games/" + strconv.Itoa(*presence.RootPlaceId),
 					},
 				},
 
@@ -113,5 +70,8 @@ func StartDiscordRpc() error {
 
 			lastPresence = presence
 		}
+
+		// Discord Rich Presence has a ratelimit of 1 update per 15 seconds
+		time.Sleep(15 * time.Second)
 	}
 }
