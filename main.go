@@ -48,6 +48,11 @@ func main() {
 	}
 	log.Println(joinData)
 
+	// Check whether security token needs refreshing or not
+	if err := RefreshSecurityCookie(&joinData); err != nil {
+		log.Fatalln(err)
+	}
+
 	rbxPlayer := filepath.Join(config.Roblox.InstallationDir, version, "RobloxPlayerBeta.exe")
 	cmd := exec.Command(rbxPlayer,
 		"--app",

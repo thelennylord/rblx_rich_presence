@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/zalando/go-keyring"
 )
 
 type User struct {
@@ -30,7 +32,14 @@ type PresenceRoot struct {
 	UserPresences []UserPresence `json:"userPresences"`
 }
 
-var rbxUser User
+var (
+	rbxUser User
+
+	ErrNotAuthenticated       = errors.New("user is not authenticated to roblox")
+	ErrGameIdNotFound         = errors.New("unable to get game id")
+	ErrTicketRedemption       = errors.New("could not redeem authentication ticket")
+	ErrSecurityCookieNotFound = errors.New("response did not contain .ROBLOSECURITY cookie")
+)
 
 func GetUserPresence() (*UserPresence, error) {
 	presenceData := &PresenceRoot{}
@@ -43,14 +52,14 @@ func GetUserPresence() (*UserPresence, error) {
 		return &UserPresence{}, err
 	}
 
-	config, err := GetConfig()
+	token, err := keyring.Get("RblxRichPresence", "token")
 	if err != nil {
-		return &UserPresence{}, err
+		return nil, err
 	}
 
 	req.AddCookie(&http.Cookie{
 		Name:  ".ROBLOSECURITY",
-		Value: config.Roblox.RbxSecurity,
+		Value: token,
 	})
 
 	req.Header.Add("Content-Type", "application/json")
@@ -62,7 +71,7 @@ func GetUserPresence() (*UserPresence, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return &UserPresence{}, errors.New("unable to get game id")
+		return &UserPresence{}, ErrGameIdNotFound
 	}
 
 	data, err := io.ReadAll(resp.Body)
@@ -88,14 +97,14 @@ func GetAuthenticatedUser() (*User, error) {
 		return nil, err
 	}
 
-	config, err := GetConfig()
+	token, err := keyring.Get("RblxRichPresence", "token")
 	if err != nil {
 		return nil, err
 	}
 
 	req.AddCookie(&http.Cookie{
 		Name:  ".ROBLOSECURITY",
-		Value: config.Roblox.RbxSecurity,
+		Value: token,
 	})
 
 	client := &http.Client{}
@@ -105,7 +114,7 @@ func GetAuthenticatedUser() (*User, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("user is not authenticated to roblox")
+		return nil, ErrNotAuthenticated
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -118,4 +127,93 @@ func GetAuthenticatedUser() (*User, error) {
 	}
 
 	return &rbxUser, nil
+}
+
+func RefreshSecurityCookie(joinData *JoinData) error {
+	// TODO: Handle other errors
+	if user, err := GetAuthenticatedUser(); user != nil {
+		return err
+	}
+
+	// Re-authenticate the user
+	body := strings.NewReader(`{"authenticationTicket": "` + joinData.gameInfo + `"}`)
+	req, err := http.NewRequest("POST", "https://auth.roblox.com/v1/authentication-ticket/redeem", body)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("User-Agent", "RobloxStudio/WinInet")
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("RBXAuthenticationNegotiation", "https://www.roblox.com/")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return ErrTicketRedemption
+	}
+
+	for _, cookie := range resp.Cookies() {
+		if cookie.Name != ".ROBLOSECURITY" {
+			continue
+		}
+
+		if err := keyring.Set("RblxRichPresence", "token", cookie.Value); err != nil {
+			return err
+		}
+
+		ticket, err := GetAuthenticationTicket()
+		if err != nil {
+			return err
+		}
+
+		joinData.gameInfo = ticket
+		return nil
+	}
+
+	return ErrSecurityCookieNotFound
+}
+
+func GetAuthenticationTicket() (string, error) {
+	req, err := http.NewRequest("POST", "https://auth.roblox.com/v1/authentication-ticket", nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Referer", "https://www.roblox.com/")
+
+	token, err := keyring.Get("RblxRichPresence", "token")
+	if err != nil {
+		return "", err
+	}
+
+	req.AddCookie(&http.Cookie{
+		Name:  ".ROBLOSECURITY",
+		Value: token,
+	})
+
+	client := &http.Client{}
+
+	var resp *http.Response
+	for {
+		resp, err = client.Do(req)
+		if err != nil {
+			return "", nil
+		}
+
+		// Get new x-csrf-token if provided one was invalid
+		if resp.StatusCode == http.StatusForbidden {
+			req.Header.Add("x-csrf-token", resp.Header.Get("x-csrf-token"))
+		} else {
+			break
+		}
+	}
+
+	return resp.Header.Get("rbx-authentication-ticket"), nil
 }

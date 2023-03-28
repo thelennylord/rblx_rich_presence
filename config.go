@@ -17,7 +17,6 @@ type Config struct {
 
 type RbxConfig struct {
 	InstallationDir string `toml:"installation_dir"`
-	RbxSecurity     string `toml:"rbx_security"`
 }
 
 type PresenceConfig struct {
@@ -35,7 +34,7 @@ func GetConfig() (Config, error) {
 		}
 
 		config := Config{
-			RbxConfig{rbxDir, ""},
+			RbxConfig{rbxDir},
 			PresenceConfig{true, true, true},
 		}
 
