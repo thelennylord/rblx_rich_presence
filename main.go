@@ -40,6 +40,10 @@ func main() {
 	}
 
 	// Handle join arguments
+	if len(os.Args) != 2 {
+		os.Exit(0)
+	}
+
 	joinUrl := os.Args[1]
 	log.Printf("Using join url: %s", joinUrl)
 	joinData, err := unmarshallJoinUrl(joinUrl)
