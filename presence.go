@@ -26,7 +26,7 @@ func StartDiscordRpc() error {
 	}
 
 	var largeText string
-	if config.RichPresence.DisplayGame {
+	if config.RichPresence.DisplayUsername {
 		largeText = "Playing Roblox as " + user.Name
 	} else {
 		largeText = "Playing Roblox"
@@ -45,6 +45,7 @@ func StartDiscordRpc() error {
 		// User has joined a different game/server through in-game teleportation
 		if lastPresence == nil || *presence.GameId != *lastPresence.GameId {
 			startTime := time.Now()
+			placeId := strconv.Itoa(*presence.RootPlaceId)
 
 			client.SetActivity(client.Activity{
 				State:   "In an experience",
@@ -58,8 +59,16 @@ func StartDiscordRpc() error {
 
 				Buttons: []*client.Button{
 					{
-						Label: "View on Roblox",
-						Url:   "https://www.roblox.com/games/" + strconv.Itoa(*presence.RootPlaceId),
+						Label: "View on website",
+						Url:   "https://www.roblox.com/games/" + placeId,
+					},
+					{
+						Label: "Launch Roblox",
+
+						// Discord seems to be messing up the protocol link, going to use the web link instead
+						// Expected: roblox://placeId=123456
+						// Observed: roblox://placeid/=123456
+						Url: "https://www.roblox.com/games/start?placeId=" + placeId,
 					},
 				},
 
