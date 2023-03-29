@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/hugolgst/rich-go/client"
+	"github.com/ibadus/rich-go/client"
 )
 
 func StartDiscordRpc() error {
