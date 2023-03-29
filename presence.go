@@ -64,11 +64,7 @@ func StartDiscordRpc() error {
 					},
 					{
 						Label: "Launch Roblox",
-
-						// Discord seems to be messing up the protocol link, going to use the web link instead
-						// Expected: roblox://placeId=123456
-						// Observed: roblox://placeid/=123456
-						Url: "https://www.roblox.com/games/start?placeId=" + placeId,
+						Url:   "roblox://experiences/start?placeId=" + placeId,
 					},
 				},
 
