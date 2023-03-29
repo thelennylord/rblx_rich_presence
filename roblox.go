@@ -129,12 +129,7 @@ func GetAuthenticatedUser() (*User, error) {
 	return &rbxUser, nil
 }
 
-func RefreshSecurityCookie(joinData *JoinData) error {
-	// TODO: Handle other errors
-	if user, err := GetAuthenticatedUser(); user != nil {
-		return err
-	}
-
+func RefreshSecurityCookie(joinData *DirectJoinData) error {
 	// Re-authenticate the user
 	body := strings.NewReader(`{"authenticationTicket": "` + joinData.gameInfo + `"}`)
 	req, err := http.NewRequest("POST", "https://auth.roblox.com/v1/authentication-ticket/redeem", body)

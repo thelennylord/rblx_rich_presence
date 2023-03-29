@@ -1,21 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-)
+	"time"
 
-type JoinData struct {
-	launchMode       string
-	gameInfo         string
-	placeLauncherUrl string
-	robloxLocale     string
-	gameLocale       string
-}
+	drpc "github.com/thelennylord/discord-rpc"
+)
 
 func main() {
 	// Setup logger
@@ -30,7 +25,7 @@ func main() {
 
 	version, err := Update()
 	if err != nil {
-		// TODO: Should we continue to launch roblox or?
+		//REVIEW: Should we continue to launch roblox or?
 		log.Fatalln(err)
 	}
 
@@ -39,73 +34,92 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	// Handle join arguments
-	if len(os.Args) != 2 {
-		os.Exit(0)
-	}
-
-	joinUrl := os.Args[1]
-	log.Printf("Using join url: %s", joinUrl)
-	joinData, err := unmarshallJoinUrl(joinUrl)
+	client, err := drpc.New(ClientId)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	log.Println(joinData)
+	defer client.Socket.Close()
 
-	// Check whether security token needs refreshing or not
-	if err := RefreshSecurityCookie(&joinData); err != nil {
-		log.Fatalln(err)
+	// If no join arguments are applied, probably launched from Discord
+	var joinData interface{}
+
+	if len(os.Args) < 2 {
+		ch := make(chan drpc.ActivityEventData)
+		client.RegisterEvent(ch, drpc.ActivityJoinEvent)
+		tried := false
+
+	loop:
+		for {
+			select {
+			case data := <-ch:
+				pair := strings.Split(data.Secret, ";")
+				placeId, gameId := pair[0], pair[1]
+				joinData = DeeplinkJoinData{placeId, gameId}
+				break loop
+
+			default:
+				if tried {
+					os.Exit(0)
+				}
+
+				tried = true
+				// Try again after 3 seconds
+				time.Sleep(3 * time.Second)
+			}
+
+		}
+
+	} else {
+		joinUrl := os.Args[1]
+		log.Printf("Using join url: %s", joinUrl)
+
+		// TODO: Support deep links
+		joinData, err = unmarshallJoinUrl(joinUrl)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		log.Println(joinData)
+
 	}
 
 	rbxPlayer := filepath.Join(config.Roblox.InstallationDir, version, "RobloxPlayerBeta.exe")
-	cmd := exec.Command(rbxPlayer,
-		"--app",
-		"-t", joinData.gameInfo,
-		"-j", joinData.placeLauncherUrl,
-		"--rloc", joinData.robloxLocale,
-		"--gloc", joinData.gameLocale,
-	)
+	var cmd *exec.Cmd
+
+	switch t := joinData.(type) {
+	case DirectJoinData:
+		// Refresh the security cookie
+		if err := RefreshSecurityCookie(&t); err != nil {
+			log.Fatalln(err)
+		}
+
+		cmd = exec.Command(rbxPlayer,
+			"--app",
+			"-t", t.gameInfo,
+			"-j", t.placeLauncherUrl,
+			"--rloc", t.robloxLocale,
+			"--gloc", t.gameLocale,
+			"-b", t.browserTrackerId,
+			"-channel",
+			"znext",
+		)
+
+	case DeeplinkJoinData:
+		if _, err := GetAuthenticatedUser(); err != nil {
+			// TODO: Display the error on the screen
+			log.Fatalln("user not authenticated to roblox")
+		}
+
+		cmd = exec.Command(rbxPlayer,
+			"--app",
+			"--deeplink",
+			fmt.Sprintf("roblox://experiences/start?placeId=%s&gameInstanceId=%s/", t.placeId, t.gameId),
+			"-channel",
+			"znext",
+		)
+	}
 	cmd.Start()
 
-	go StartDiscordRpc()
+	go setPresence(client)
+
 	cmd.Process.Wait()
-}
-
-func unmarshallJoinUrl(joinUrl string) (JoinData, error) {
-	joinData := JoinData{}
-
-	for _, option := range strings.Split(joinUrl, "+") {
-		pair := strings.Split(option, ":")
-		if len(pair) < 2 {
-			continue
-		}
-
-		name, value := pair[0], pair[1]
-
-		switch name {
-		case "launchmode":
-			joinData.launchMode = value
-
-		case "gameinfo":
-			joinData.gameInfo = value
-
-		case "placelauncherurl":
-			escapedValue, err := url.QueryUnescape(value)
-			if err != nil {
-				return joinData, err
-			}
-
-			joinData.placeLauncherUrl = escapedValue
-		case "robloxLocale":
-			joinData.robloxLocale = value
-
-		case "gameLocale":
-			joinData.gameLocale = value
-
-		default:
-			continue
-		}
-	}
-
-	return joinData, nil
 }

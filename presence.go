@@ -9,7 +9,7 @@ import (
 
 var ClientId = "725360592570941490"
 
-func StartDiscordRpc() error {
+func setPresence(client *drpc.Client) error {
 	user, err := GetAuthenticatedUser()
 	if err != nil {
 		// User is not authenticated (most likely the security cookie has expired)
@@ -27,11 +27,6 @@ func StartDiscordRpc() error {
 		largeText = "Playing Roblox as " + user.Name
 	} else {
 		largeText = "Playing Roblox"
-	}
-
-	client, err := drpc.New(ClientId)
-	if err != nil {
-		return err
 	}
 
 	// Update loop
