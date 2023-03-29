@@ -50,11 +50,9 @@ func Update() (string, error) {
 	}
 
 	currVersionPath := filepath.Join(config.Roblox.InstallationDir, clientVersion.ClientVersionUpload)
-	if _, err = os.Stat(currVersionPath); err != nil {
-		if !errors.Is(err, fs.ErrNotExist) {
-			return clientVersion.ClientVersionUpload, nil
-		}
-
+	if _, err = os.Stat(currVersionPath); err == nil {
+		return clientVersion.ClientVersionUpload, nil
+	} else if !errors.Is(err, fs.ErrNotExist) {
 		return "", err
 	}
 
