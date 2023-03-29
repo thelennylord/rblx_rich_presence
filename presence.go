@@ -4,15 +4,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ibadus/rich-go/client"
+	drpc "github.com/thelennylord/discord-rpc"
 )
 
-func StartDiscordRpc() error {
-	err := client.Login("725360592570941490")
-	if err != nil {
-		return err
-	}
+var ClientId = "725360592570941490"
 
+func StartDiscordRpc() error {
 	user, err := GetAuthenticatedUser()
 	if err != nil {
 		// User is not authenticated (most likely the security cookie has expired)
@@ -32,6 +29,11 @@ func StartDiscordRpc() error {
 		largeText = "Playing Roblox"
 	}
 
+	client, err := drpc.New(ClientId)
+	if err != nil {
+		return err
+	}
+
 	// Update loop
 	var lastPresence *UserPresence
 
@@ -44,20 +46,21 @@ func StartDiscordRpc() error {
 
 		// User has joined a different game/server through in-game teleportation
 		if lastPresence == nil || *presence.GameId != *lastPresence.GameId {
-			startTime := time.Now()
 			placeId := strconv.Itoa(*presence.RootPlaceId)
 
-			client.SetActivity(client.Activity{
+			client.SetActivity(drpc.Activity{
 				State:   "In an experience",
 				Details: "Playing " + presence.LastLocation,
 
-				LargeImage: "logo",
-				LargeText:  largeText,
+				Assets: &drpc.Assets{
+					LargeImage: "logo",
+					LargeText:  largeText,
 
-				SmallImage: "play_status",
-				SmallText:  presence.LastLocation,
+					SmallImage: "play_status",
+					SmallText:  presence.LastLocation,
+				},
 
-				Buttons: []*client.Button{
+				Buttons: []*drpc.Button{
 					{
 						Label: "View on website",
 						Url:   "https://www.roblox.com/games/" + placeId,
@@ -68,15 +71,16 @@ func StartDiscordRpc() error {
 					},
 				},
 
-				Timestamps: &client.Timestamps{
-					Start: &startTime,
+				Timestamps: &drpc.Timestamps{
+					Start: &drpc.Epoch{Time: time.Now()},
 				},
 			})
 
 			lastPresence = presence
 		}
 
-		// Discord Rich Presence has a ratelimit of 1 update per 15 seconds
-		time.Sleep(15 * time.Second)
+		// Discord Rich Presence has a ratelimit of 5 updates per 20 seoconds
+		// So checking every 5 seconds seems resonable
+		time.Sleep(5 * time.Second)
 	}
 }
