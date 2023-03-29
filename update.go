@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -49,8 +50,12 @@ func Update() (string, error) {
 	}
 
 	currVersionPath := filepath.Join(config.Roblox.InstallationDir, clientVersion.ClientVersionUpload)
-	if _, err = os.Stat(currVersionPath); !os.IsNotExist(err) {
-		return clientVersion.ClientVersionUpload, nil
+	if _, err = os.Stat(currVersionPath); err != nil {
+		if !errors.Is(err, fs.ErrNotExist) {
+			return clientVersion.ClientVersionUpload, nil
+		}
+
+		return "", err
 	}
 
 	files := getPackageManifest(clientVersion.ClientVersionUpload)
@@ -108,7 +113,7 @@ func Update() (string, error) {
 }
 
 func getClientVersionOnline() (ClientVersion, error) {
-	resp, err := http.Get("https://clientsettingscdn.roblox.com/v2/client-version/WindowsPlayer")
+	resp, err := http.Get("https://clientsettingscdn.roblox.com/v2/client-version/WindowsPlayer/channel/ZNext")
 	if err != nil {
 		log.Fatalln(err)
 	}
