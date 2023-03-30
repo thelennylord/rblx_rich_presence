@@ -14,7 +14,7 @@ jobs:
     
     env:
       GO111MODULE: "on"
-      APP_NAME: ${{ github.repository }}
+      APP_NAME: ${{ github.repository.split('/')[1] }}
 
     steps:
       - name: Install Go
@@ -34,5 +34,5 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ env.APP_NAME }}_${{ matrix.os }}${{ matrix.os == 'windows-latest' && '.exe' || '' }}
-          path: ./${{ env.APP_NAME }}_${{ matrix.os }}${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+          name: ${{ env.APP_NAME }}-${{ matrix.os.split('-')[0] }}${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+          path: ./${{ env.APP_NAME }}-${{ matrix.os.split('-')[0] }}${{ matrix.os == 'windows-latest' && '.exe' || '' }}
