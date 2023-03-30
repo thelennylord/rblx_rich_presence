@@ -104,7 +104,7 @@ func Update() (string, error) {
 	// Roblox requires AppSettings.xml to run
 	err = os.WriteFile(filepath.Join(installDir, "AppSettings.xml"), []byte(appSettingsXML), 0777)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	return clientVersion.ClientVersionUpload, nil
@@ -115,6 +115,7 @@ func getClientVersionOnline() (ClientVersion, error) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return ClientVersion{}, errors.New("unable to fetch client version")
@@ -140,6 +141,7 @@ func getPackageManifest(version string) []FileInfo {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	defer resp.Body.Close()
 
 	manifest, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -210,31 +212,32 @@ func unzipFile(source, destination string) error {
 	extractFile := func(file *zip.File) error {
 		rc, err := file.Open()
 		if err != nil {
-			return nil
+			return err
 		}
 		defer rc.Close()
 
 		path := filepath.Join(destination, file.Name)
 
 		if file.FileInfo().IsDir() {
-			if err = os.MkdirAll(path, file.Mode()); err != nil {
+			if err := os.MkdirAll(path, file.Mode()); err != nil {
 				return err
 			}
 
-		} else {
-			if err = os.MkdirAll(filepath.Dir(path), file.Mode()); err != nil {
-				return err
-			}
+			return nil
+		}
 
-			out, err := os.Create(path)
-			if err != nil {
-				return err
-			}
-			defer out.Close()
+		if err := os.MkdirAll(filepath.Dir(path), file.Mode()); err != nil {
+			return err
+		}
 
-			if _, err = io.Copy(out, rc); err != nil {
-				return err
-			}
+		out, err := os.Create(path)
+		if err != nil {
+			return err
+		}
+		defer out.Close()
+
+		if _, err = io.Copy(out, rc); err != nil {
+			return err
 		}
 
 		return nil

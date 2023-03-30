@@ -1,0 +1,11 @@
+linters:
+  enable:
+    - bodyclose
+    - errname
+    - unconvert
+    - nilerr
+    - goconst
+    - misspell
+    - nakedret
+    - nestif
+    - prealloc

@@ -45,7 +45,11 @@ func main() {
 
 	if len(os.Args) < 2 {
 		ch := make(chan drpc.ActivityEventData)
-		client.RegisterEvent(ch, drpc.ActivityJoinEvent)
+		err := client.RegisterEvent(ch, drpc.ActivityJoinEvent)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
 		tried := false
 
 	loop:
@@ -89,7 +93,7 @@ func main() {
 	case DirectJoinData:
 		// Refresh the security cookie
 		if err := RefreshSecurityCookie(&t); err != nil {
-			log.Fatalln(err)
+			log.Fatal(err)
 		}
 
 		cmd = exec.Command(rbxPlayer,
@@ -117,9 +121,13 @@ func main() {
 			"znext",
 		)
 	}
-	cmd.Start()
+
+	if err := cmd.Start(); err != nil {
+		log.Fatal(err)
+	}
 
 	go setPresence(client)
 
-	cmd.Process.Wait()
+	processState, _ := cmd.Process.Wait()
+	log.Printf("Roblox exited with code %d", processState.ExitCode())
 }

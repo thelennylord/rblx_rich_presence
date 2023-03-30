@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"strconv"
 	"time"
 
@@ -9,17 +10,17 @@ import (
 
 var ClientId = "725360592570941490"
 
-func setPresence(client *drpc.Client) error {
+func setPresence(client *drpc.Client) {
 	user, err := GetAuthenticatedUser()
 	if err != nil {
 		// User is not authenticated (most likely the security cookie has expired)
 		// TODO: notify user about invalid cookie
-		return err
+		log.Fatal(err)
 	}
 
 	config, err := GetConfig()
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 
 	var largeText string
@@ -43,7 +44,7 @@ func setPresence(client *drpc.Client) error {
 		if lastPresence == nil || *presence.GameId != *lastPresence.GameId {
 			placeId := strconv.Itoa(*presence.RootPlaceId)
 
-			client.SetActivity(drpc.Activity{
+			err := client.SetActivity(drpc.Activity{
 				State:   "In an experience",
 				Details: "Playing " + presence.LastLocation,
 
@@ -70,6 +71,9 @@ func setPresence(client *drpc.Client) error {
 					Start: &drpc.Epoch{Time: time.Now()},
 				},
 			})
+			if err != nil {
+				log.Fatal(err)
+			}
 
 			lastPresence = presence
 		}

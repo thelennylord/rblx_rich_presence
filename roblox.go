@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -54,7 +55,7 @@ func GetUserPresence() (*UserPresence, error) {
 
 	token, err := keyring.Get("RblxRichPresence", "token")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get security token from keyring: %v", err)
 	}
 
 	req.AddCookie(&http.Cookie{
@@ -108,10 +109,12 @@ func GetAuthenticatedUser() (*User, error) {
 	})
 
 	client := &http.Client{}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, ErrNotAuthenticated
@@ -143,10 +146,12 @@ func RefreshSecurityCookie(joinData *DirectJoinData) error {
 	req.Header.Add("RBXAuthenticationNegotiation", "https://www.roblox.com/")
 
 	client := &http.Client{}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return ErrTicketRedemption
@@ -199,8 +204,9 @@ func GetAuthenticationTicket() (string, error) {
 	for {
 		resp, err = client.Do(req)
 		if err != nil {
-			return "", nil
+			return "", err
 		}
+		defer resp.Body.Close()
 
 		// Get new x-csrf-token if provided one was invalid
 		if resp.StatusCode == http.StatusForbidden {

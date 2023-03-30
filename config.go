@@ -2,7 +2,9 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"os/user"
@@ -27,7 +29,7 @@ type PresenceConfig struct {
 
 func GetConfig() (Config, error) {
 	file, err := os.Open("config.toml")
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		rbxDir, err := findRbxDir()
 		if err != nil {
 			log.Fatalln(err)
@@ -53,13 +55,13 @@ func GetConfig() (Config, error) {
 
 	content, err := io.ReadAll(file)
 	if err != nil {
-		return Config{}, err
+		return Config{}, fmt.Errorf("failed to read config.toml: %v", err)
 	}
 
 	var config Config
 	err = toml.Unmarshal(content, &config)
 	if err != nil {
-		return Config{}, err
+		return Config{}, fmt.Errorf("failed to marshal config.toml (likely malformed toml?): %v", err)
 	}
 
 	return config, nil
@@ -74,7 +76,7 @@ func SetConfig(config Config) error {
 
 	err = os.WriteFile("config.toml", data, 0777)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not save config: %v", err)
 	}
 
 	return nil
