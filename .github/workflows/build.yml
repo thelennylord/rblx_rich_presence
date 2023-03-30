@@ -1,0 +1,38 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+    
+    env:
+      GO111MODULE: "on"
+      APP_NAME: ${{ github.repository }}
+
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ~1.20
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Build
+        run: go build -v -o ${{ env.APP_NAME }}_${{ matrix.os }}${{ matrix.os == 'windows-latest' && '.exe' || '' }} ./...
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.APP_NAME }}_${{ matrix.os }}${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+          path: ./${{ env.APP_NAME }}_${{ matrix.os }}${{ matrix.os == 'windows-latest' && '.exe' || '' }}
