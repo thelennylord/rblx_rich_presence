@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	drpc "github.com/thelennylord/discord-rpc"
+	drpc "github.com/thelennylord/go-discordrpc"
 )
 
 func main() {
