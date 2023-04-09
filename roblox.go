@@ -29,8 +29,18 @@ type UserPresence struct {
 	LastOnline       string  `json:"lastOnline"`
 }
 
-type PresenceRoot struct {
+type presenceRoot struct {
 	UserPresences []UserPresence `json:"userPresences"`
+}
+
+type ImageData struct {
+	TargetId int    `json:"targetId"`
+	State    string `json:"state"`
+	ImageUrl string `json:"imageUrl"`
+}
+
+type imageDataRoot struct {
+	ImageData []ImageData `json:"data"`
 }
 
 var (
@@ -43,7 +53,7 @@ var (
 )
 
 func GetUserPresence() (*UserPresence, error) {
-	presenceData := &PresenceRoot{}
+	presenceData := &presenceRoot{}
 
 	userid := strconv.FormatUint(uint64(rbxUser.Id), 10)
 
@@ -217,4 +227,42 @@ func GetAuthenticationTicket() (string, error) {
 	}
 
 	return resp.Header.Get("rbx-authentication-ticket"), nil
+}
+
+func GetExperienceIcon(universeId int) (string, error) {
+	endpoint := "https://thumbnails.roblox.com/v1/games/icons?universeIds=%d&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false"
+
+	req, err := http.NewRequest("GET", fmt.Sprintf(endpoint, universeId), nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Accept", "application/json")
+
+	client := &http.Client{}
+
+	var resp *http.Response
+
+	resp, err = client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("could not get experience icon: %v", err)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	iconData := &imageDataRoot{}
+	if err = json.Unmarshal(body, &iconData); err != nil {
+		return "", err
+	}
+
+	return *&iconData.ImageData[0].ImageUrl, nil
 }

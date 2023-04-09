@@ -44,12 +44,17 @@ func setPresence(client *drpc.Client) {
 		if lastPresence == nil || *presence.GameId != *lastPresence.GameId {
 			placeId := strconv.Itoa(*presence.RootPlaceId)
 
-			err := client.SetActivity(drpc.Activity{
+			imageUrl, err := GetExperienceIcon(*presence.RootPlaceId)
+			if err != nil {
+				return
+			}
+
+			err = client.SetActivity(drpc.Activity{
 				State:   "In an experience",
 				Details: "Playing " + presence.LastLocation,
 
 				Assets: &drpc.Assets{
-					LargeImage: "logo",
+					LargeImage: imageUrl,
 					LargeText:  largeText,
 
 					SmallImage: "play_status",
