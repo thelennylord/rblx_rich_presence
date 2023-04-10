@@ -46,7 +46,7 @@ func setPresence(client *drpc.Client) {
 
 			imageUrl, err := GetExperienceIcon(*presence.UniverseId)
 			if err != nil {
-				return
+				log.Fatalf("error while getting experience's icon of %d; error: %v", *presence.UniverseId, err)
 			}
 
 			err = client.SetActivity(drpc.Activity{
