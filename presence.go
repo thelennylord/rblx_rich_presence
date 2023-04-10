@@ -44,7 +44,7 @@ func setPresence(client *drpc.Client) {
 		if lastPresence == nil || *presence.GameId != *lastPresence.GameId {
 			placeId := strconv.Itoa(*presence.RootPlaceId)
 
-			imageUrl, err := GetExperienceIcon(*presence.RootPlaceId)
+			imageUrl, err := GetExperienceIcon(*presence.UniverseId)
 			if err != nil {
 				return
 			}
