@@ -264,5 +264,5 @@ func GetExperienceIcon(universeId int) (string, error) {
 		return "", err
 	}
 
-	return *&iconData.ImageData[0].ImageUrl, nil
+	return iconData.ImageData[0].ImageUrl, nil
 }

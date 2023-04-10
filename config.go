@@ -95,11 +95,18 @@ func findRbxDir() (string, error) {
 	}
 
 	for _, dir := range possibleDirs {
-		if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		log.Printf("searching for Roblox in %s", dir)
+
+		if _, err = os.Stat(dir); err == nil {
+			log.Printf("found Roblox in %s", dir)
 			return dir, nil
+
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			return "", fmt.Errorf("error occurred while searching for Roblox in %s: %v", dir, err)
 		}
+
 	}
 
-	return "", errors.New("unable to find roblox directory")
+	return "", errors.New("unable to find Roblox directory")
 
 }
