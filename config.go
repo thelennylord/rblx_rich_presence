@@ -7,7 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
-	"os/user"
+	"path/filepath"
 
 	"github.com/pelletier/go-toml"
 )
@@ -83,13 +83,13 @@ func SetConfig(config Config) error {
 }
 
 func findRbxDir() (string, error) {
-	currUser, err := user.Current()
+	userCacheDir, err := os.UserCacheDir()
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalf("could not get UserCacheDir: %v", err)
 	}
 
 	possibleDirs := []string{
-		`C:\Users\` + currUser.Name + `\AppData\Local\Roblox\Versions`,
+		filepath.Join(userCacheDir, "Roblox", "Versions"),
 		`C:\Program Files\Roblox\Versions`,
 		`C:\Program Files (x86)\Roblox\Versions`,
 	}
