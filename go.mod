@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/pelletier/go-toml v1.9.5
-	github.com/thelennylord/go-discordrpc v0.0.0-20230411085558-ee7ecec8135b
+	github.com/thelennylord/go-discordrpc v0.0.0-20230411110435-54a8cea9bbe9
 	github.com/zalando/go-keyring v0.2.2
 )
 
