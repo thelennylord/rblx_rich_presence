@@ -51,7 +51,7 @@ func setPresence(client *drpc.Client) {
 
 			err = client.SetActivity(drpc.Activity{
 				State:   "In an experience",
-				Details: "Playing " + presence.LastLocation,
+				Details: presence.LastLocation,
 
 				Assets: &drpc.Assets{
 					LargeImage: imageUrl,
