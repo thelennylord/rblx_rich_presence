@@ -72,8 +72,12 @@ func main() {
 
 		log.Println("Registered command to Discord")
 
-		// TODO: Replace Roblox URL protocol's launch path to rblx_rich_presence
-		log.Println("Setup done; exiting...")
+		err = setup()
+		if err != nil {
+			log.Fatalf("error occurred while setting up rich presence: %v", err)
+		}
+
+		log.Printf("Setup completed; exiting...")
 		os.Exit(0)
 	}
 
