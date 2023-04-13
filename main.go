@@ -11,6 +11,7 @@ import (
 	"time"
 
 	drpc "github.com/thelennylord/go-discordrpc"
+	"github.com/zalando/go-keyring"
 )
 
 func main() {
@@ -129,14 +130,16 @@ func main() {
 	switch t := joinData.(type) {
 	case DirectJoinData:
 		// Refresh the security cookie
-		if err := RefreshSecurityCookie(&t); err != nil {
-			if !errors.Is(err, ErrTicketRedemption) {
-				log.Fatal(err)
-			}
+		if err := RefreshSecurityCookie(&t); err != nil && !errors.Is(err, ErrTicketRedemption) {
+			log.Fatalf("Failed while refreshing security cookie: %v", err)
 		}
 
 		t.gameInfo, err = GetAuthenticationTicket()
 		if err != nil {
+			if errors.Is(err, keyring.ErrNotFound) {
+				log.Fatalln("Authentication ticket provided is invalid and user has no valid security cookie saved")
+			}
+
 			log.Fatalf("Couldn't get authentication ticket: %v", err)
 		}
 
