@@ -28,7 +28,13 @@ type PresenceConfig struct {
 }
 
 func GetConfig() (Config, error) {
-	file, err := os.Open("config.toml")
+	dir, err := execDir()
+	if err != nil {
+		return Config{}, err
+	}
+
+	file, err := os.Open(filepath.Join(dir, "config.toml"))
+
 	if errors.Is(err, fs.ErrNotExist) {
 		rbxDir, err := findRbxDir()
 		if err != nil {
@@ -40,7 +46,7 @@ func GetConfig() (Config, error) {
 			PresenceConfig{true, true, true},
 		}
 
-		err = SetConfig(config)
+		err = config.Save()
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -68,13 +74,18 @@ func GetConfig() (Config, error) {
 }
 
 // TODO: Set config
-func SetConfig(config Config) error {
+func (config Config) Save() error {
 	data, err := toml.Marshal(config)
 	if err != nil {
 		return err
 	}
 
-	err = os.WriteFile("config.toml", data, 0777)
+	dir, err := execDir()
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(filepath.Join(dir, "config.toml"), data, 0644)
 	if err != nil {
 		return fmt.Errorf("could not save config: %v", err)
 	}

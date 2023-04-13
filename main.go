@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -17,13 +18,21 @@ import (
 func main() {
 	// Setup logger
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
-	file, err := os.Create("log.txt")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	defer file.Close()
 
-	log.SetOutput(file)
+	dirPath, err := execDir()
+	if err != nil {
+		panic(err)
+	}
+
+	logFile, err := os.Create(filepath.Join(dirPath, "log.txt"))
+	if err != nil {
+		fmt.Println(err)
+		time.Sleep(1000 * time.Second)
+	}
+	defer logFile.Close()
+
+	multiWriter := io.MultiWriter(os.Stdout, logFile)
+	log.SetOutput(multiWriter)
 
 	version, err := Update()
 	if err != nil {
@@ -177,4 +186,13 @@ func main() {
 
 	processState, _ := cmd.Process.Wait()
 	log.Printf("Roblox exited with code %d", processState.ExitCode())
+}
+
+func execDir() (string, error) {
+	execPath, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Dir(execPath), nil
 }
